@@ -1,0 +1,46 @@
+class,label
+railway station,0
+airplane,1
+airport,2
+baseball diamond,3
+basketball court,4
+beach,5
+bridge,6
+chaparral,7
+church,8
+circular farmland,9
+cloud,10
+commercial area,11
+dense residential,12
+desert,13
+forest,14
+freeway,15
+golf course,16
+ground track field,17
+harbor,18
+industrial area,19
+intersection,20
+island,21
+lake,22
+meadow,23
+medium residential,24
+river,25
+mobile home park,26
+mountain,27
+overpass,28
+palace,29
+parking lot,30
+railway,31
+rectangular farmland,32
+roundabout,33
+ship,34
+runway,35
+sea ice,36
+snowberg,37
+sparse residential,38
+stadium,39
+storage tank,40
+tennis court,41
+terrace,42
+thermal power station,43
+wetland,44

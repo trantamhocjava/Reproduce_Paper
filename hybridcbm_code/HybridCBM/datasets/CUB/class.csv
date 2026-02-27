@@ -1,0 +1,201 @@
+class,label
+black footed albatross,0
+laysan albatross,1
+sooty albatross,2
+groove billed ani,3
+crested auklet,4
+least auklet,5
+parakeet auklet,6
+rhinoceros auklet,7
+brewer blackbird,8
+red winged blackbird,9
+rusty blackbird,10
+yellow headed blackbird,11
+bobolink,12
+indigo bunting,13
+lazuli bunting,14
+painted bunting,15
+cardinal,16
+spotted catbird,17
+gray catbird,18
+yellow breasted chat,19
+eastern towhee,20
+chuck will widow,21
+brandt cormorant,22
+red faced cormorant,23
+pelagic cormorant,24
+bronzed cowbird,25
+shiny cowbird,26
+brown creeper,27
+american crow,28
+fish crow,29
+black billed cuckoo,30
+mangrove cuckoo,31
+yellow billed cuckoo,32
+gray crowned rosy finch,33
+purple finch,34
+northern flicker,35
+acadian flycatcher,36
+great crested flycatcher,37
+least flycatcher,38
+olive sided flycatcher,39
+scissor tailed flycatcher,40
+vermilion flycatcher,41
+yellow bellied flycatcher,42
+frigatebird,43
+northern fulmar,44
+gadwall,45
+american goldfinch,46
+european goldfinch,47
+boat tailed grackle,48
+eared grebe,49
+horned grebe,50
+pied billed grebe,51
+western grebe,52
+blue grosbeak,53
+evening grosbeak,54
+pine grosbeak,55
+rose breasted grosbeak,56
+pigeon guillemot,57
+california gull,58
+glaucous winged gull,59
+heermann gull,60
+herring gull,61
+ivory gull,62
+ring billed gull,63
+slaty backed gull,64
+western gull,65
+anna hummingbird,66
+ruby throated hummingbird,67
+rufous hummingbird,68
+green violetear,69
+long tailed jaeger,70
+pomarine jaeger,71
+blue jay,72
+florida jay,73
+green jay,74
+dark eyed junco,75
+tropical kingbird,76
+gray kingbird,77
+belted kingfisher,78
+green kingfisher,79
+pied kingfisher,80
+ringed kingfisher,81
+white breasted kingfisher,82
+red legged kittiwake,83
+horned lark,84
+pacific loon,85
+mallard,86
+western meadowlark,87
+hooded merganser,88
+red breasted merganser,89
+mockingbird,90
+nighthawk,91
+clark nutcracker,92
+white breasted nuthatch,93
+baltimore oriole,94
+hooded oriole,95
+orchard oriole,96
+scott oriole,97
+ovenbird,98
+brown pelican,99
+white pelican,100
+western wood pewee,101
+sayornis,102
+american pipit,103
+whip poor will,104
+horned puffin,105
+common raven,106
+white necked raven,107
+american redstart,108
+geococcyx,109
+loggerhead shrike,110
+great grey shrike,111
+baird sparrow,112
+black throated sparrow,113
+brewer sparrow,114
+chipping sparrow,115
+clay colored sparrow,116
+house sparrow,117
+field sparrow,118
+fox sparrow,119
+grasshopper sparrow,120
+harris sparrow,121
+henslow sparrow,122
+le conte sparrow,123
+lincoln sparrow,124
+nelson sharp tailed sparrow,125
+savannah sparrow,126
+seaside sparrow,127
+song sparrow,128
+tree sparrow,129
+vesper sparrow,130
+white crowned sparrow,131
+white throated sparrow,132
+cape glossy starling,133
+bank swallow,134
+barn swallow,135
+cliff swallow,136
+tree swallow,137
+scarlet tanager,138
+summer tanager,139
+artic tern,140
+black tern,141
+caspian tern,142
+common tern,143
+elegant tern,144
+forsters tern,145
+least tern,146
+green tailed towhee,147
+brown thrasher,148
+sage thrasher,149
+black capped vireo,150
+blue headed vireo,151
+philadelphia vireo,152
+red eyed vireo,153
+warbling vireo,154
+white eyed vireo,155
+yellow throated vireo,156
+bay breasted warbler,157
+black and white warbler,158
+black throated blue warbler,159
+blue winged warbler,160
+canada warbler,161
+cape may warbler,162
+cerulean warbler,163
+chestnut sided warbler,164
+golden winged warbler,165
+hooded warbler,166
+kentucky warbler,167
+magnolia warbler,168
+mourning warbler,169
+myrtle warbler,170
+nashville warbler,171
+orange crowned warbler,172
+palm warbler,173
+pine warbler,174
+prairie warbler,175
+prothonotary warbler,176
+swainson warbler,177
+tennessee warbler,178
+wilson warbler,179
+worm eating warbler,180
+yellow warbler,181
+northern waterthrush,182
+louisiana waterthrush,183
+bohemian waxwing,184
+cedar waxwing,185
+american three toed woodpecker,186
+pileated woodpecker,187
+red bellied woodpecker,188
+red cockaded woodpecker,189
+red headed woodpecker,190
+downy woodpecker,191
+bewick wren,192
+cactus wren,193
+carolina wren,194
+house wren,195
+marsh wren,196
+rock wren,197
+winter wren,198
+common yellowthroat,199
