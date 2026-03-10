@@ -1,0 +1,8 @@
+class,label
+actinic keratoses,0
+basal cell carcinoma,1
+benign keratosis-like lesions,2
+dermatofibroma,3
+melanocytic nevi,4
+melanoma,5
+vascular lesions,6
