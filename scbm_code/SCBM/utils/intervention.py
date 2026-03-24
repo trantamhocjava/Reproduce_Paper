@@ -3,14 +3,14 @@ Utility functions for intervention of SCBMs and baselines.
 """
 
 import torch
-from torch import nn
-from torch.utils.data import TensorDataset, DataLoader
-from torch.distributions import MultivariateNormal
 import torch.nn.functional as F
+import wandb
 from scipy.stats import chi2
+from torch import nn
+from torch.distributions import MultivariateNormal
+from torch.utils.data import DataLoader, TensorDataset
 from torchmin import minimize
 from tqdm import tqdm
-import wandb
 
 from utils.minimize_constraint import minimize_constr
 from utils.utils import numerical_stability_check

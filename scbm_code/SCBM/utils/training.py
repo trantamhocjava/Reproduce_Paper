@@ -3,14 +3,14 @@ Utility functions for training.
 """
 
 import numpy as np
-from sklearn.metrics import jaccard_score
 import torch
-from torch import nn
-from tqdm import tqdm
-from torchmetrics import Metric
 import wandb
+from sklearn.metrics import jaccard_score
+from torch import nn
+from torchmetrics import Metric
+from tqdm import tqdm
 
-from utils.metrics import calc_target_metrics, calc_concept_metrics
+from utils.metrics import calc_concept_metrics, calc_target_metrics
 from utils.plotting import compute_and_plot_heatmap
 
 
@@ -315,7 +315,7 @@ def validate_one_epoch_scbm(
         prints = f"Epoch {epoch}, Validation: "
     else:
         wandb.log({f"test/{k}": v for k, v in metrics_dict.items()})
-        prints = f"Test: "
+        prints = "Test: "
     for key, value in metrics_dict.items():
         prints += f"{key}: {value:.3f} "
     print(prints)
@@ -406,7 +406,7 @@ def validate_one_epoch_cbm(
         prints = f"Epoch {epoch}, Validation: "
     else:
         wandb.log({f"test/{k}": v for k, v in metrics_dict.items()})
-        prints = f"Test: "
+        prints = "Test: "
     for key, value in metrics_dict.items():
         prints += f"{key}: {value:.3f} "
     print(prints)
@@ -552,7 +552,7 @@ class Custom_Metrics(Metric):
         )
 
         if self.cov_norm != 0:
-            metrics = metrics | {"covariance_norm": self.cov_norm / self.n_samples}
+            metrics["covariance_norm"] = self.cov_norm / self.n_samples
 
         if validation is True:
             c_pred_probs_list = []

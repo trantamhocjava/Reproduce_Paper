@@ -8,6 +8,8 @@ explicd code/train/
 explicd_adacbm_code/train/
 ecbm_code/trainAWA2/
 ecbm_code/trainCUB/
+scbm_code/trainAWA2
+scbm_code/trainCUB
 
 # BASIC 
 # Byte-compiled / optimized / DLL files

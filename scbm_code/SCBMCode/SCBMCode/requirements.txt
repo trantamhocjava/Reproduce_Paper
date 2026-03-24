@@ -1,0 +1,6 @@
+wandb
+torchmetrics==0.11.4
+hydra-core
+plotly
+transformers==4.37.2
+pytorch-minimize

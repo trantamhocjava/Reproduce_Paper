@@ -146,10 +146,10 @@ def train_model(
                 loss.backward()
                 optimizer.step()
 
-            sum_cls_loss += cls_loss
-            sum_cy_loss += cy_loss
-            sum_cpt_loss += cpt_loss
-            sum_loss += loss
+            sum_cls_loss += cls_loss.item()
+            sum_cy_loss += cy_loss.item()
+            sum_cpt_loss += cpt_loss.item()
+            sum_loss += loss.item()
 
         train_cls_loss = sum_cls_loss / len(trainLoader)
         train_cy_loss = sum_cy_loss / len(trainLoader)

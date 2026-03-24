@@ -79,7 +79,7 @@ class LitModel(pl.LightningModule):
         return {
             "optimizer": optimizer,
             "lr_scheduler": lr_scheduler,
-            "monitor": "epoch_loss_epoch",
+            "monitor": "epoch_val_loss",
         }
 
     def training_step(self, batch, batch_idx):

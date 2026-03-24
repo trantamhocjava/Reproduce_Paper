@@ -57,6 +57,7 @@ if __name__ == "__main__":
 
     torch.use_deterministic_algorithms(True)
     seed_everything(args.random_seed, workers=True)
+
     uuid = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
     exp_dir = os.path.join("./exp", uuid)
     args.exp_dir = exp_dir

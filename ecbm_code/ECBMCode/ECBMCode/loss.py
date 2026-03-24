@@ -30,7 +30,6 @@ class EBMLoss_concept(nn.Module):
         self.class_list = class_list
 
     def forward(self, energy, gt):
-
         y_tem = gt.unsqueeze(-1).to(torch.int64)
         cpt_loss = torch.zeros([]).to(DEVICE)
         for i in range(energy.shape[1]):

@@ -4,31 +4,30 @@ Run this file to train models using a Hydra configuration, e.g.:
 """
 
 import os
-from os.path import join
-from pathlib import Path
 import time
 import uuid
+from os.path import join
+from pathlib import Path
 
+import hydra
 import torch
 import torch.optim as optim
-import hydra
-from omegaconf import DictConfig, OmegaConf
 import wandb
+from omegaconf import DictConfig, OmegaConf
 
 from models.losses import create_loss
 from models.models import create_model
-
-from utils.data import get_data, get_empirical_covariance, get_concept_groups
+from utils.data import get_concept_groups, get_data, get_empirical_covariance
 from utils.intervention import intervene_cbm, intervene_scbm
 from utils.training import (
-    freeze_module,
-    unfreeze_module,
+    Custom_Metrics,
     create_optimizer,
+    freeze_module,
     train_one_epoch_cbm,
     train_one_epoch_scbm,
+    unfreeze_module,
     validate_one_epoch_cbm,
     validate_one_epoch_scbm,
-    Custom_Metrics,
 )
 from utils.utils import reset_random_seeds
 
