@@ -54,14 +54,14 @@ if __name__ == "__main__":
         default=None,
     )
     parser.add_option(
-        "--epochs",
-        dest="epochs",
+        "--start_epoch",
+        dest="start_epoch",
         type="int",
     )
     parser.add_option(
-        "--training_mode",
-        dest="training_mode",
-        type="str",
+        "--end_epoch",
+        dest="end_epoch",
+        type="int",
     )
     parser.add_option(
         "--batch_size",
@@ -93,24 +93,9 @@ if __name__ == "__main__":
         help="[resnet18, simple_CNN, FCNN]",
     )
     parser.add_option(
-        "--decrease_every",
-        type="int",
-        dest="decrease_every",
-    )
-    parser.add_option(
-        "--lr_divisor",
-        type="int",
-        dest="lr_divisor",
-    )
-    parser.add_option(
-        "--weight_decay",
-        type="float",
-        dest="weight_decay",
-    )
-    parser.add_option(
-        "--compile",
+        "--freezebb",
         action="store_true",
-        dest="compile",
+        dest="freezebb",
     )
     parser.add_option(
         "--num_monte_carlo",
@@ -124,10 +109,6 @@ if __name__ == "__main__":
     )
     parser.add_option(
         "--concept_learning", type="str", dest="concept_learning", default=None
-    )
-    parser.add_option("--inter_policy", type="str", dest="inter_policy", default=None)
-    parser.add_option(
-        "--inter_strategy", type="str", dest="inter_strategy", default=None
     )
 
     (cfg, args) = parser.parse_args()

@@ -14,6 +14,17 @@ DEVICE = "cuda"
 CP_PATH = "/kaggle/working/checkpoint"
 GPU = "0"
 
+COLUMNS = [
+    "n_concepts",
+    "test_c_acc_overall",
+    "test_c_acc",
+    "test_y_acc",
+    "test_y_bmac",
+    "test_target_loss",
+    "test_concepts_loss",
+    "test_total_loss",
+    "test_time",
+]
 
 CLASS_NAMES = {
     "cub": [

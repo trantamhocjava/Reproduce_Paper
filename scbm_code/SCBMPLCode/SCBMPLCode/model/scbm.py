@@ -6,7 +6,6 @@ from torch import nn
 from torch.distributions import MultivariateNormal, RelaxedBernoulli
 
 from . import utils
-from .FCNNEncoder import FCNNEncoder
 
 
 class SCBM(nn.Module):
@@ -29,7 +28,6 @@ class SCBM(nn.Module):
         num_monte_carlo (int): The number of Monte Carlo samples for uncertainty estimation.
         straight_through (bool): Flag indicating whether to use straight-through gradients.
         curr_temp (float): The current temperature for the Gumbel-Softmax distribution.
-        cov_type (str): The type of covariance matrix ("empirical", "global", or "amortized", where "empirical is fixed at start").
 
     Methods:
         forward(x, epoch, validation=False, c_true=None):
@@ -46,13 +44,10 @@ class SCBM(nn.Module):
         self.num_classes = len(config.class_names)
 
         self.encoder_arch = config.encoder_arch
-        self.head_arch = config.head_arch
         self.concept_learning = config.concept_learning
         self.num_monte_carlo = config.num_monte_carlo
         self.straight_through = config.straight_through
         self.curr_temp = 1.0
-
-        self.cov_type = config.cov_type
 
         self.init_temp = 1.0
         self.final_temp = 0.5
@@ -63,70 +58,34 @@ class SCBM(nn.Module):
 
         # Architectures
         # Encoder h(.)
-        if self.encoder_arch == "FCNN":
-            n_features = 256
-            self.encoder = FCNNEncoder(
-                num_inputs=config.num_covariates, num_hidden=n_features, num_deep=2
-            )
-        elif self.encoder_arch == "resnet18":
-            self.encoder, preprocess = utils.get_backbone(config.encoder_arch)
+        self.encoder, preprocess, n_features = utils.get_encoder(config)
 
-            n_features = self.encoder.fc.in_features
-            self.encoder.fc = utils.Identity()
-
-        elif self.encoder_arch == "simple_CNN":
-            n_features = 256
-            self.encoder = nn.Sequential(
-                nn.Conv2d(3, 32, 5, 3),
-                nn.ReLU(),
-                nn.Conv2d(32, 64, 5, 3),
-                nn.ReLU(),
-                nn.MaxPool2d(2),
-                nn.Dropout(0.25),
-                nn.Flatten(),
-                nn.Linear(9216, n_features),
-                nn.ReLU(),
-            )
+        if config.freezebb:
+            utils.freeze_module(self.encoder)
 
         self.mu_concepts = nn.Linear(n_features, self.num_concepts, bias=True)
 
-        if self.cov_type == "global":
-            self.sigma_concepts = nn.Parameter(
-                torch.zeros(int(self.num_concepts * (self.num_concepts + 1) / 2))
-            )  # Predict lower triangle of concept covariance
-        elif self.cov_type == "empirical":
-            self.sigma_concepts = torch.zeros(
-                int(self.num_concepts * (self.num_concepts + 1) / 2)
-            )
-        else:
-            self.sigma_concepts = nn.Linear(
-                n_features,
-                int(self.num_concepts * (self.num_concepts + 1) / 2),
-                bias=True,
-            )
-            self.sigma_concepts.weight.data *= (
-                0.01  # To prevent exploding precision matrix at initialization
-            )
+        self.sigma_concepts = nn.Linear(
+            n_features,
+            int(self.num_concepts * (self.num_concepts + 1) / 2),
+            bias=True,
+        )
+        self.sigma_concepts.weight.data *= (
+            0.01  # To prevent exploding precision matrix at initialization
+        )
 
         # Assume binary concepts
         self.act_c = nn.Sigmoid()
 
         # Link function g(.)
-        if self.num_classes == 2:
-            self.pred_dim = 1
-        elif self.num_classes > 2:
-            self.pred_dim = self.num_classes
-
-        if self.head_arch == "linear":
-            self.head = nn.Linear(self.num_concepts, self.pred_dim)
-        else:
-            fc1_y = nn.Linear(self.num_concepts, 256)
-            fc2_y = nn.Linear(256, self.pred_dim)
-            self.head = nn.Sequential(fc1_y, nn.ReLU(), fc2_y)
+        self.pred_dim = utils.get_pred_dim(self.num_classes)
+        self.head = utils.get_head_layer(
+            config.head_arch, self.num_concepts, self.pred_dim
+        )
 
         self.preprocess_list = utils.get_v2_list_from_v1_preprocess(preprocess)
 
-    def forward(self, x, epoch, validation=False, return_full=False, c_true=None):
+    def forward(self, x, epoch, validation=False, return_full=False):
         """
         Perform a forward pass through the Stochastic Concept Bottleneck Model (SCBM).
 
@@ -158,30 +117,23 @@ class SCBM(nn.Module):
 
         # Get mu and cholesky decomposition of covariance
         c_mu = self.mu_concepts(intermediate)
-        if self.cov_type == "global":
-            c_sigma = self.sigma_concepts.repeat(c_mu.size(0), 1)
-        elif self.cov_type == "empirical":
-            c_sigma = self.sigma_concepts.unsqueeze(0).repeat(c_mu.size(0), 1, 1)
-        else:
-            c_sigma = self.sigma_concepts(intermediate)
 
-        if self.cov_type == "empirical":
-            c_triang_cov = c_sigma
-        else:
-            # Fill the lower triangle of the covariance matrix with the values and make diagonal positive
-            c_triang_cov = torch.zeros(
-                (c_sigma.shape[0], self.num_concepts, self.num_concepts),
-                device=c_sigma.device,
-                dtype=c_sigma.dtype,
-            )
-            rows, cols = torch.tril_indices(
-                row=self.num_concepts, col=self.num_concepts, offset=0
-            )
-            diag_idx = rows == cols
-            c_triang_cov[:, rows, cols] = c_sigma
-            c_triang_cov[:, range(self.num_concepts), range(self.num_concepts)] = (
-                F.softplus(c_sigma[:, diag_idx]) + 1e-6
-            ).to(device=c_triang_cov.device, dtype=c_triang_cov.dtype)
+        c_sigma = self.sigma_concepts(intermediate)
+
+        # Fill the lower triangle of the covariance matrix with the values and make diagonal positive
+        c_triang_cov = torch.zeros(
+            (c_sigma.shape[0], self.num_concepts, self.num_concepts),
+            device=c_sigma.device,
+            dtype=c_sigma.dtype,
+        )
+        rows, cols = torch.tril_indices(
+            row=self.num_concepts, col=self.num_concepts, offset=0
+        )
+        diag_idx = rows == cols
+        c_triang_cov[:, rows, cols] = c_sigma
+        c_triang_cov[:, range(self.num_concepts), range(self.num_concepts)] = (
+            F.softplus(c_sigma[:, diag_idx]) + 1e-6
+        ).to(device=c_triang_cov.device, dtype=c_triang_cov.dtype)
 
         # Sample from predicted normal distribution
         c_dist = MultivariateNormal(c_mu, scale_tril=c_triang_cov)
@@ -191,28 +143,33 @@ class SCBM(nn.Module):
         c_mcmc_prob = self.act_c(c_mcmc_logit)
 
         # For all MCMC samples simultaneously sample from Bernoulli
-        curr_temp = self.compute_temperature(epoch)
-        dist = RelaxedBernoulli(
-            temperature=torch.tensor(curr_temp, device=c_mcmc_prob.device),
-            probs=c_mcmc_prob,
-        )
-
-        # Bernoulli relaxation
-        mcmc_relaxed = dist.rsample()
-        if self.straight_through:
-            # Straight-Through Gumbel Softmax
-            mcmc_hard = (mcmc_relaxed > 0.5) * 1
-            c_mcmc = mcmc_hard - mcmc_relaxed.detach() + mcmc_relaxed
+        if validation:
+            # No backward
+            c_mcmc = torch.bernoulli(c_mcmc_prob)
         else:
-            c_mcmc = mcmc_relaxed
+            # Need backward
+            curr_temp = self.compute_temperature(epoch)
+            dist = RelaxedBernoulli(
+                temperature=torch.tensor(curr_temp, device=c_mcmc_prob.device),
+                probs=c_mcmc_prob,
+            )
+
+            # Bernoulli relaxation
+            mcmc_relaxed = dist.rsample()
+            if self.straight_through:
+                # Straight-Through Gumbel Softmax
+                mcmc_hard = (mcmc_relaxed > 0.5) * 1
+                c_mcmc = mcmc_hard - mcmc_relaxed.detach() + mcmc_relaxed
+            else:
+                c_mcmc = mcmc_relaxed
 
         y_pred_logits = self.compute_y_pred_logits(c_mcmc, c_mcmc_logit)
 
         # Return concept mu for interventions
         if return_full:
-            return c_mcmc_prob, c_mcmc_logit, c_mu, c_triang_cov, y_pred_logits
+            return c_mcmc_prob, c_mu, c_triang_cov, y_pred_logits, c_mcmc_logit
         else:
-            return c_mcmc_prob, c_mcmc_logit, c_triang_cov, y_pred_logits
+            return c_mcmc_prob, c_triang_cov, y_pred_logits, c_mcmc_logit
 
     def compute_y_pred_logits(self, c_mcmc_probs, c_mcmc_logits):
         # Pick the concept tensor: [B, C, M]
@@ -268,15 +225,3 @@ class SCBM(nn.Module):
         )
         self.curr_temp = curr_temp
         return curr_temp
-
-    def freeze_c(self):
-        self.head.apply(utils.freeze_module)
-
-    def freeze_t(self):
-        self.head.apply(utils.unfreeze_module)
-        self.encoder.apply(utils.freeze_module)
-        self.mu_concepts.apply(utils.freeze_module)
-        if isinstance(self.sigma_concepts, nn.Linear):
-            self.sigma_concepts.apply(utils.freeze_module)
-        else:
-            self.sigma_concepts.requires_grad = False

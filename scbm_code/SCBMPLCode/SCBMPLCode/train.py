@@ -26,15 +26,15 @@ class MetricCalculator:
 
         self.n_batchs = 0
 
-    def update(self, y_logit, c_logit, y, c, target_loss, concepts_loss, total_loss):
+    def update(self, y_logit, c_prob, y, c, target_loss, concepts_loss, total_loss):
         self.n_batchs += 1
 
         y_logit = y_logit.clone().detach()
-        c_logit = c_logit.clone().detach()
+        c_prob = c_prob.clone().detach()
 
         _, y_pred = torch.max(y_logit, 1)
 
-        c_pred = c_logit > 0.5
+        c_pred = c_prob > 0.5
 
         self.c_pred = torch.cat((self.c_pred, c_pred.cpu()), 0)
         self.c_true = torch.cat((self.c_true, c.cpu()), 0)
@@ -97,172 +97,6 @@ class MetricCalculator:
         return np.mean(np.all(c_true == c_pred, axis=1)) * 100
 
 
-# class CBMTrain:
-#     def __init__(
-#         self,
-#         trainLoader,
-#         valLoader,
-#         model,
-#         optimizer,
-#         scaler,
-#         mode,
-#         config,
-#         loss_fn,
-#         epoch,
-#     ):
-#         self.trainLoader = trainLoader
-#         self.valLoader = valLoader
-#         self.model = model
-#         self.optimizer = optimizer
-#         self.scaler = scaler
-#         self.mode = mode
-#         self.config = config
-#         self.loss_fn = loss_fn
-#         self.epoch = epoch
-
-#     def train_one_epoch(self):
-#         metric = MetricCalculator(self.config.num_concepts)
-#         loss_return = LossCalculator(len(self.trainLoader))
-
-#         self.model.train()
-
-#         if self.config.training_mode in ("sequential", "independent"):
-#             if self.mode == "c":
-#                 self.model.head.eval()
-#             elif self.mode == "t":
-#                 self.model.encoder.eval()
-
-#         for data, label, concept in self.trainLoader:
-#             data = data.float().cuda()
-#             label = label.long().cuda()
-#             concept = concept.long().cuda()
-
-#             self.optimizer.zero_grad(set_to_none=True)
-
-#             if self.config.amp:
-#                 with torch.autocast(device_type=const.DEVICE, dtype=torch.float16):
-#                     (
-#                         loss,
-#                         concepts_pred_probs,
-#                         target_pred_logits,
-#                         target_loss,
-#                         concepts_loss,
-#                         total_loss,
-#                     ) = self.get_loss(data, concept, label)
-
-#                 self.scaler.scale(loss).backward()
-#                 self.scaler.step(self.optimizer)
-#                 self.scaler.update()
-
-#             else:
-#                 (
-#                     loss,
-#                     concepts_pred_probs,
-#                     target_pred_logits,
-#                     target_loss,
-#                     concepts_loss,
-#                     total_loss,
-#                 ) = self.get_loss(data, concept, label)
-
-#                 loss.backward()
-#                 self.optimizer.step()
-
-#             # Update loss and metric
-#             loss_return.update(target_loss, concepts_loss, total_loss)
-#             metric.update(target_pred_logits, concepts_pred_probs, label, concept)
-
-#         return loss_return.return_metrics(), metric.return_metrics()
-
-#     def validate_one_epoch(self):
-#         metric = MetricCalculator(self.config.num_concepts)
-#         loss_return = LossCalculator(len(self.valLoader))
-
-#         self.model.eval()
-#         with torch.no_grad():
-#             for data, label, concept in self.valLoader:
-#                 data = data.float().cuda()
-#                 label = label.long().cuda()
-#                 concept = concept.long().cuda()
-
-#                 (
-#                     concepts_pred_probs,
-#                     concepts_pred_logits,
-#                     target_pred_logits,
-#                     concepts_hard,
-#                 ) = self.model(data, self.epoch, validation=True)
-
-#                 if self.config.concept_learning == "autoregressive":
-#                     concepts_pred_probs = torch.mean(concepts_pred_probs, dim=-1)
-
-#                 target_loss, concepts_loss, total_loss = self.loss_fn(
-#                     concepts_pred_logits, concept, target_pred_logits, label
-#                 )
-
-#                 # Update loss and metric
-#                 loss_return.update(target_loss, concepts_loss, total_loss)
-#                 metric.update(target_pred_logits, concepts_pred_probs, label, concept)
-
-#         return loss_return.return_metrics(), metric.return_metrics()
-
-#     def get_loss(self, data, concept, label):
-#         # Forward pass
-#         concepts_pred_probs, concepts_pred_logits, target_pred_logits, concepts_hard = (
-#             self.forward_cbm(data, concept)
-#         )
-
-#         # Compute the loss
-#         target_loss, concepts_loss, total_loss = self.loss_fn(
-#             concepts_pred_logits, concept, target_pred_logits, label
-#         )
-
-#         loss = None
-#         if self.mode == "j":
-#             loss = total_loss
-#         elif self.mode == "c":
-#             loss = concepts_loss
-#         else:
-#             loss = target_loss
-
-#         return (
-#             loss,
-#             concepts_pred_probs,
-#             target_pred_logits,
-#             target_loss,
-#             concepts_loss,
-#             total_loss,
-#         )
-
-#     def forward_cbm(self, data, concept):
-#         if self.config.training_mode == "independent" and self.mode == "t":
-#             (
-#                 concepts_pred_probs,
-#                 concepts_pred_logits,
-#                 target_pred_logits,
-#                 concepts_hard,
-#             ) = self.model(data, self.epoch, concept)
-#         elif self.config.concept_learning == "autoregressive" and self.mode == "c":
-#             (
-#                 concepts_pred_probs,
-#                 concepts_pred_logits,
-#                 target_pred_logits,
-#                 concepts_hard,
-#             ) = self.model(data, self.epoch, concepts_train_ar=concept)
-#         else:
-#             (
-#                 concepts_pred_probs,
-#                 concepts_pred_logits,
-#                 target_pred_logits,
-#                 concepts_hard,
-#             ) = self.model(data, self.epoch)
-
-#         return (
-#             concepts_pred_probs,
-#             concepts_pred_logits,
-#             target_pred_logits,
-#             concepts_hard,
-#         )
-
-
 class SCBMTrainPL(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
@@ -275,26 +109,7 @@ class SCBMTrainPL(pl.LightningModule):
 
         self.model = SCBM(config)
 
-        self.loss_fn = SCBLoss(config=config, reduction="mean")
-
-    def init_covariance(self, trainLoader):
-        # Initialize covariance with empirical covariance
-        if self.config.cov_type == "empirical":
-            self.model.sigma_concepts = utils.get_empirical_covariance(
-                trainLoader
-            ).cuda()
-        elif self.config.cov_type == "global":
-            lower_triangle = utils.get_empirical_covariance(trainLoader).cuda()
-            rows, cols = torch.tril_indices(
-                row=self.config.num_concepts, col=self.config.num_concepts, offset=0
-            )
-            self.model.sigma_concepts = torch.nn.Parameter(lower_triangle[rows, cols])
-            # Fill the lower triangle of the covariance matrix with the values and make diagonal positive
-            diag_idx = rows == cols
-            with torch.no_grad():
-                self.model.sigma_concepts[diag_idx] = (
-                    lower_triangle[rows, cols][diag_idx].expm1().clamp_min(1e-6).log()
-                )  # softplus inverse of diag
+        self.loss_fn = SCBLoss(config=config)
 
     # define optimizers and schedulers
     def configure_optimizers(self):
@@ -314,13 +129,13 @@ class SCBMTrainPL(pl.LightningModule):
 
     def get_loss(self, data, concept, label):
         # Forward pass
-        concepts_mcmc_probs, concepts_mcmc_logits, triang_cov, target_pred_logits = (
-            self.model(data, self.current_epoch, c_true=concept)
+        concepts_mcmc_probs, triang_cov, target_pred_logits, c_mcmc_logit = self.model(
+            data, self.current_epoch
         )
 
         # Compute the loss
         target_loss, concepts_loss, prec_loss, total_loss = self.loss_fn(
-            concepts_mcmc_logits,
+            c_mcmc_logit,
             concept,
             target_pred_logits,
             label,
@@ -329,6 +144,7 @@ class SCBMTrainPL(pl.LightningModule):
 
         concepts_pred_probs = concepts_mcmc_probs.mean(-1)
 
+        # Default, mode = "j", not need prec_loss
         loss = total_loss
 
         return (
@@ -459,7 +275,7 @@ class JointCBMTrainPL(pl.LightningModule):
 
         self.model = CBM(config)
 
-        self.loss_fn = CBLoss(config=config, reduction="mean")
+        self.loss_fn = CBLoss(config=config)
 
     # define optimizers and schedulers
     def configure_optimizers(self):

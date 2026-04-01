@@ -90,6 +90,7 @@ def intervene_scbm(
 
                     # Store predictions
                     concepts_pred_probs = concepts_mcmc_probs.mean(-1)
+
                     triang_cov = triang_cov.to(torch.float64)
                     c_mu = mu.to(torch.float64)
                     c_cov = torch.matmul(
@@ -381,6 +382,7 @@ def intervene_cbm(
                         target_pred_logits,
                         concepts_hard,
                     ) = model(batch_features, epoch, validation=True)
+
                     if config.model.concept_learning == "autoregressive":
                         concepts_pred_probs_m = torch.mean(
                             concepts_pred_probs, dim=-1

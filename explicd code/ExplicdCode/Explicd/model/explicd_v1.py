@@ -9,6 +9,16 @@ from torchvision.transforms import v2
 from ..const import DEVICE, LATENT_DIM
 
 
+def freeze_module(m):
+    for param in m.parameters():
+        param.requires_grad = False
+
+
+def unfreeze_module(m):
+    for param in m.parameters():
+        param.requires_grad = True
+
+
 class FFN(nn.Module):
     def __init__(self, input_dim, ff_dim):
         super().__init__()
@@ -33,28 +43,15 @@ def get_count_value_in_dict(concept_list):
     return res
 
 
-def extract_v2_normalize_from_preprocess(preprocess):
-    mean = None
-    std = None
+def get_preprocess_list_v2(preprocess):
+    normalize = None
+    center_crop = None
     for t in preprocess.transforms:
         if isinstance(t, v1.Normalize):
-            mean, std = t.mean, t.std
+            normalize = v2.Normalize(mean=t.mean, std=t.std)
 
-    return v2.Normalize(mean=mean, std=std)
-
-
-def extract_v2_center_crop_from_preprocess(preprocess):
-    size = None
-    for t in preprocess.transforms:
         if isinstance(t, v1.CenterCrop):
-            size = t.size
-
-    return v2.CenterCrop(size=size)
-
-
-def get_preprocess_list_v2(preprocess):
-    normalize = extract_v2_normalize_from_preprocess(preprocess)
-    center_crop = extract_v2_center_crop_from_preprocess(preprocess)
+            center_crop = v2.CenterCrop(size=t.size)
 
     return [center_crop, v2.ToDtype(torch.float32, scale=True), normalize]
 
@@ -62,8 +59,9 @@ def get_preprocess_list_v2(preprocess):
 def build_clip_model(model_name):
     model, preprocess = create_model_from_pretrained(model_name)
     tokenizer = get_tokenizer(model_name)
+    preprocess_list = get_preprocess_list_v2(preprocess)
 
-    return model, preprocess, tokenizer
+    return model, preprocess_list, tokenizer
 
 
 def get_visual_feature_layer(model, model_name):
@@ -135,10 +133,8 @@ class ExpLICD(nn.Module):
 
         self.clip_model = clip_model
 
-        self.model, preprocess, tokenizer = build_clip_model(clip_model)
+        self.model, self.preprocess_list, tokenizer = build_clip_model(clip_model)
         self.model.to(DEVICE)
-
-        self.preprocess_list = get_preprocess_list_v2(preprocess)
 
         concept_keys = list(concept_list.keys())
 

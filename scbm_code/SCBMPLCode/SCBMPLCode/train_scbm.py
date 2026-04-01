@@ -38,9 +38,6 @@ def main(config):
     rank_zero_info("Val")
     utils.print_shape_first_batch(valLoader)
 
-    rank_zero_info("init covariance")
-    model.init_covariance(trainLoader)
-
     if config.last_state is not None:
         rank_zero_info(f"Restore last state from {config.last_state}")
         ckpt_path = f"{config.last_state}/last.ckpt"
@@ -63,7 +60,7 @@ def main(config):
         devices=2,
         max_epochs=config.end_epoch,
         precision="16-mixed" if config.amp else 32,
-        strategy=config.train_strategy,
+        strategy="ddp",
         default_root_dir=const.CP_PATH,
         num_sanity_val_steps=0,
         logger=[csv_logger],
@@ -135,19 +132,13 @@ if __name__ == "__main__":
         dest="dataset_name",
     )
     parser.add_option("--dataset_dir", type="str", dest="dataset_dir")
-    parser.add_option("--train_strategy", type="str", dest="train_strategy")
     parser.add_option("--amp", action="store_true", dest="amp")
-    parser.add_option(
-        "--use_scheduler",
-        action="store_true",
-        dest="use_scheduler",
-    )
     parser.add_option(
         "--scheduler",
         type="str",
         dest="scheduler",
         default=None,
-        help="[LinearLR, ReduceLROnPlateau]",
+        help="[LinearLR, ReduceLROnPlateau, StepLR]",
     )
     parser.add_option(
         "--num_concepts",
@@ -165,6 +156,11 @@ if __name__ == "__main__":
         help="[resnet18, simple_CNN, FCNN]",
     )
     parser.add_option(
+        "--freezebb",
+        action="store_true",
+        dest="freezebb",
+    )
+    parser.add_option(
         "--decrease_every",
         type="int",
         dest="decrease_every",
@@ -180,11 +176,6 @@ if __name__ == "__main__":
         dest="weight_decay",
     )
     parser.add_option(
-        "--compile",
-        action="store_true",
-        dest="compile",
-    )
-    parser.add_option(
         "--num_monte_carlo",
         type="int",
         dest="num_monte_carlo",
@@ -197,17 +188,6 @@ if __name__ == "__main__":
     parser.add_option(
         "--concept_learning", type="str", dest="concept_learning", default=None
     )
-    parser.add_option("--inter_policy", type="str", dest="inter_policy", default=None)
-    parser.add_option(
-        "--inter_strategy", type="str", dest="inter_strategy", default=None
-    )
-    parser.add_option(
-        "--pretrain_concepts", action="store_true", dest="pretrain_concepts"
-    )
-    parser.add_option(
-        "--embedding_size", type="int", dest="embedding_size", default=None
-    )
-    parser.add_option("--cov_type", type="str", dest="cov_type", default=None)
     parser.add_option("--reg_precision", type="str", dest="reg_precision", default=None)
     parser.add_option("--reg_weight", type="float", dest="reg_weight", default=None)
     parser.add_option("--level", type="float", dest="level", default=None)

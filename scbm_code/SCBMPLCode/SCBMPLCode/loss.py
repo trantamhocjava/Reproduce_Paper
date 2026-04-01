@@ -10,7 +10,6 @@ class CBLoss(nn.Module):
     def __init__(
         self,
         config,
-        reduction="mean",
     ):
         """
         Initialize the CBLoss.
@@ -23,8 +22,7 @@ class CBLoss(nn.Module):
         """
         super(CBLoss, self).__init__()
         self.num_classes = len(config.class_names)
-        self.alpha = config.alpha if config.training_mode == "joint" else 1.0
-        self.reduction = reduction
+        self.alpha = config.alpha
 
     def forward(
         self,
@@ -50,15 +48,11 @@ class CBLoss(nn.Module):
         if self.num_classes == 2:
             # Logits to probs
             target_pred_probs = nn.Sigmoid()(target_pred_logits.squeeze(1))
-            target_loss = F.binary_cross_entropy(
-                target_pred_probs, target_true.float(), reduction=self.reduction
-            )
+            target_loss = F.binary_cross_entropy(target_pred_probs, target_true.float())
         else:
-            target_loss = F.cross_entropy(
-                target_pred_logits, target_true.long(), reduction=self.reduction
-            )
+            target_loss = F.cross_entropy(target_pred_logits, target_true.long())
 
-        total_loss = target_loss + concepts_loss
+        total_loss = target_loss + self.alpha * concepts_loss
 
         return target_loss, concepts_loss, total_loss
 
@@ -68,12 +62,9 @@ class CBLoss(nn.Module):
             concepts_pred_logits, concepts_true, reduction="none"
         )  #  [B, C]
 
-        if self.reduction == "mean":
-            concepts_loss = concepts_loss.mean(dim=0).sum()
-        elif self.reduction == "sum":
-            concepts_loss = concepts_loss.sum(dim=0).sum()
+        concepts_loss = concepts_loss.mean(dim=0).sum()
 
-        return self.alpha * concepts_loss
+        return concepts_loss
 
 
 class SCBLoss(nn.Module):
@@ -81,7 +72,7 @@ class SCBLoss(nn.Module):
     Loss function for the Stochastic Concept Bottleneck Model (SCBM).
     """
 
-    def __init__(self, config, reduction=None):
+    def __init__(self, config):
         """
         Initialize the SCBLoss.
 
@@ -100,7 +91,7 @@ class SCBLoss(nn.Module):
 
     def forward(
         self,
-        concepts_mcmc_probs,
+        concepts_mcmc_logit,
         concepts_true,
         target_pred_logits,
         target_true,
@@ -121,7 +112,7 @@ class SCBLoss(nn.Module):
         Returns:
             Tensor: Target loss, concept loss, precision loss, and total loss.
         """
-        concepts_loss = self.compute_concept_loss(concepts_mcmc_probs, concepts_true)
+        concepts_loss = self.compute_concept_loss(concepts_mcmc_logit, concepts_true)
 
         if self.num_classes == 2:
             # Logits to probs
@@ -156,17 +147,17 @@ class SCBLoss(nn.Module):
         else:
             prec_loss = torch.zeros_like(concepts_loss)
 
-        total_loss = target_loss + concepts_loss + prec_loss
+        total_loss = target_loss + self.alpha * concepts_loss + prec_loss
 
         return target_loss, concepts_loss, prec_loss, total_loss
 
-    def compute_concept_loss(self, concepts_mcmc_logits, concepts_true):
+    def compute_concept_loss(self, concepts_mcmc_logit, concepts_true):
         concepts_true_expanded = concepts_true.unsqueeze(-1).expand_as(
-            concepts_mcmc_logits
+            concepts_mcmc_logit
         )
 
         bce_loss = F.binary_cross_entropy_with_logits(
-            concepts_mcmc_logits, concepts_true_expanded.float(), reduction="none"
+            concepts_mcmc_logit, concepts_true_expanded.float(), reduction="none"
         )  # [B,C,MCMC]
         intermediate_concepts_loss = -torch.sum(bce_loss, dim=1)  # [B,MCMC]
         mcmc_loss = -torch.logsumexp(
@@ -175,4 +166,4 @@ class SCBLoss(nn.Module):
         # The concept loss computation is bounded by - log_num_mc adding log_num_mc moves
         # bound to 0. Preventing negative losses.
 
-        return self.alpha * (torch.mean(mcmc_loss) + self.log_num_mc)
+        return torch.mean(mcmc_loss) + self.log_num_mc

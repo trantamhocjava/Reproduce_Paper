@@ -1,4 +1,6 @@
 import ast
+import csv
+import os
 import random
 import time
 
@@ -180,7 +182,7 @@ def build_optimizer(model, config):
 
 
 def build_scheduler(optimizer, config):
-    if not config.use_scheduler:
+    if config.scheduler is None:
         return None, None
 
     monitor = None
@@ -235,7 +237,7 @@ def seed_everything_in_pl():
     torch.backends.cudnn.benchmark = False
 
 
-def numerical_stability_check(cov, device, epsilon=1e-6):
+def numerical_stability_check(cov, epsilon=1e-6):
     num_added = 0
     if cov.dim() == 2:
         cov = (cov + cov.transpose(dim0=0, dim1=1)) / 2
@@ -256,9 +258,9 @@ def numerical_stability_check(cov, device, epsilon=1e-6):
         except RuntimeError:
             # Add epsilon to the diagonal
             if cov.dim() == 2:
-                cov = cov + epsilon * torch.eye(cov.size(0), device=device)
+                cov = cov + epsilon * torch.eye(cov.size(0), device=cov.device)
             else:
-                cov = cov + epsilon * torch.eye(cov.size(1), device=device)
+                cov = cov + epsilon * torch.eye(cov.size(1), device=cov.device)
             num_added += epsilon
             epsilon *= 2
     return cov
@@ -274,7 +276,7 @@ def get_empirical_covariance(dataloader):
     covariance = torch.cov(data_logits.transpose(0, 1))
 
     # Bringing it into lower triangular form
-    covariance = numerical_stability_check(covariance, device="cpu")
+    covariance = numerical_stability_check(covariance)
     lower_triangle = torch.linalg.cholesky(covariance)
 
     return lower_triangle
@@ -374,3 +376,18 @@ def print_dist_0(text):
 def destroy_process_group():
     if dist.is_available() and dist.is_initialized():
         dist.destroy_process_group()
+
+
+def create_csv_file(file_path, columns):
+    if os.path.exists(file_path):
+        return
+
+    with open(file_path, mode="w", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(columns)
+
+
+def fill_1line_in_csv_file(file_path, line):
+    with open(file_path, mode="a", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(line)

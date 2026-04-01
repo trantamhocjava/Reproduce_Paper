@@ -119,12 +119,12 @@ class AdaCBM(nn.Module):
     def forward(self, imgs):
         self.clip_model.eval()
         with torch.no_grad():
-            img_feat = self.clip_model(imgs, None)[0].float()
+            img_feat = self.clip_model(imgs, None)[0]
 
         mat = get_weight_mat(self.asso_mat, self.mask)
         image_embed = self.attention_block(img_feat)
         dot_product = image_embed @ self.concept_feat.t()
         dot_product = dot_product + self.dot_product_bias
-        pred = dot_product @ mat.t()
-        pred = pred + self.asso_mat_bias
-        return pred, dot_product
+        class_logit = dot_product @ mat.t()
+        class_logit = class_logit + self.asso_mat_bias
+        return class_logit
