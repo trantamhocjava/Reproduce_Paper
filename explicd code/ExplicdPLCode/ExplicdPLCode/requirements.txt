@@ -13,3 +13,4 @@ torchaudio
 torchvision
 tqdm
 transformers
+git+https://github.com/trantamhocjava/kltn_utils.git#egg=kltn_utils

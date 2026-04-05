@@ -1,0 +1,20 @@
+from optparse import OptionParser
+
+from kltn_utils import kltn_utils
+
+
+def main(config):
+    kltn_utils.print_demo_user_lib(config.text)
+
+
+if __name__ == "__main__":
+    parser = OptionParser()
+    parser.add_option(
+        "--text",
+        type="str",
+        dest="text",
+        default=None,
+    )
+    (cfg, args) = parser.parse_args()
+
+    main(cfg)
