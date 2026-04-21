@@ -2,6 +2,7 @@ import os
 import shutil
 from optparse import OptionParser
 
+from kltn_utils import kltn_utils
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
@@ -14,7 +15,7 @@ from .train import BlackBoxTrain
 def main(config):
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
-    utils.seed_everything_in_pl()
+    kltn_utils.seed_everything_in_pl()
 
     os.makedirs(config.cp_path, exist_ok=True)
 
@@ -44,7 +45,7 @@ def main(config):
         save_top_k=1,
         save_last=True,
         monitor=config.monitor,
-        mode=utils.get_mode(config.monitor),
+        mode=kltn_utils.get_mode(config.monitor),
         filename="best",
     )
     csv_logger = CSVLogger(save_dir=const.CP_PATH, name="", version=const.CSV_LOGS)
@@ -80,7 +81,7 @@ def main(config):
         model=model, ckpt_path=f"{const.CP_PATH}/best.ckpt", dataloaders=valLoader
     )
 
-    utils.destroy_process_group()
+    kltn_utils.destroy_process_group()
 
     rank_zero_info("Done")
 

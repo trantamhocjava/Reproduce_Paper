@@ -5,10 +5,8 @@ import torch.nn.functional as F
 class ExplicdLoss(nn.Module):
     def __init__(
         self,
-        concept_criteria,
     ):
         super().__init__()
-        self.concept_criteria = concept_criteria
 
     def forward(
         self,
@@ -27,12 +25,15 @@ class ExplicdLoss(nn.Module):
 
     def compute_concept_loss(self, concepts_pred_logits, concepts_true):
         sum_loss_concept = 0
-        for idx, key in enumerate(self.concept_criteria):
+
+        concept_criterias = concepts_pred_logits.keys()
+
+        for idx, key in enumerate(concept_criterias):
             loss_concept = F.cross_entropy(
                 concepts_pred_logits[key], concepts_true[:, idx]
             )
             sum_loss_concept += loss_concept
 
-        loss_concept = sum_loss_concept / len(self.concept_criteria)
+        loss_concept = sum_loss_concept / len(concept_criterias)
 
         return loss_concept

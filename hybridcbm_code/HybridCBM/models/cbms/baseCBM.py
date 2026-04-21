@@ -7,6 +7,7 @@ import lightning as L
 import torch
 import torch.nn.functional as F
 import torchmetrics
+
 from loss import DiscriminabilityLoss, OrthogonalityLoss, SinkhornDistanceLoss
 from metrics.clip import ClipEvaluator
 
@@ -16,11 +17,14 @@ class CBM(L.LightningModule):
         super().__init__()
         self.config = config
         self.conceptbank = conceptbank
+
         self.train_mode = (
             config.train_mode
         )  # 'joint' or 'concept_{epochs}' or 'concept_stop_{epochs}'
+
         self.concept_stop_epochs = self.config.max_epochs
         self.cls_start_epochs = 0
+
         if "concept" in self.train_mode:
             if "stop" in self.train_mode:
                 self.concept_stop_epochs = int(self.train_mode.split("_")[-1])
@@ -35,7 +39,9 @@ class CBM(L.LightningModule):
         self.config_loss(config)
         self.config_metrics()
         self.save_hyperparameters(ignore=["conceptbank"])
+
         self.automatic_optimization = False
+
         try:
             logging.info(
                 f"initialized {self.__class__.__name__} logit_scale: {self.scale.data.item()}"
@@ -174,6 +180,7 @@ class CBM(L.LightningModule):
     def forward(self, img_feat, concept_features=None):
         if concept_features is None:
             concept_features = self.concept_features
+
         sim_score = self.scale * img_feat @ concept_features.T  # B, C
         logits = self.classifier(sim_score)
         return logits

@@ -1,8 +1,7 @@
 import os
 
+from kltn_utils import kltn_utils
 from torch.utils.data import Dataset
-
-from .. import utils
 
 
 class CustomDataset(Dataset):
@@ -32,7 +31,7 @@ class CustomDataset(Dataset):
         file_path = self.file_paths[idx]
         label = int(self.labels[idx])
 
-        img = utils.read_img(file_path)
+        img = kltn_utils.read_img(file_path)
 
         if self.transforms is not None:
             img = self.transforms(img)

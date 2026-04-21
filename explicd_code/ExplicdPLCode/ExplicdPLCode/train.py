@@ -4,9 +4,10 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import torch.nn.functional as F
+from kltn_utils import kltn_utils
 from sklearn import metrics
 
-from . import const, utils
+from . import const
 from .loss import ExplicdLoss
 from .model.explicd import ExpLICD
 
@@ -128,14 +129,12 @@ class ExplicdTrain(pl.LightningModule):
             config=config,
         )
 
-        self.loss_fn = ExplicdLoss(
-            concept_criteria=self.model.concept_token_dict.keys()
-        )
+        self.loss_fn = ExplicdLoss()
 
     # define optimizers and schedulers
     def configure_optimizers(self):
-        optimizer = utils.build_optimizer(self.model, self.config)
-        lr_scheduler, monitor = utils.build_scheduler(optimizer, self.config)
+        optimizer = kltn_utils.build_optimizer(self.model, self.config)
+        lr_scheduler, monitor = kltn_utils.build_scheduler(optimizer, self.config)
         res = {
             "optimizer": optimizer,
         }
@@ -217,7 +216,7 @@ class ExplicdTrain(pl.LightningModule):
         }
         test_result["test_time"] = self.test_time
 
-        utils.save_dict_to_json(test_result, f"{const.CP_PATH}/test_result.json")
+        kltn_utils.save_dict_to_json(test_result, f"{const.CP_PATH}/test_result.json")
 
     def test_step(self, batch, batch_idx):
         data, y_true, concept = batch
@@ -250,12 +249,12 @@ class BlackBoxTrain(pl.LightningModule):
         self.val_metric = MetricCalculatorBlackBox()
         self.test_metric = MetricCalculatorBlackBox()
 
-        self.model = utils.build_blackbox_model(config)
+        self.model = kltn_utils.build_blackbox_model(config)
 
     # define optimizers and schedulers
     def configure_optimizers(self):
-        optimizer = utils.build_optimizer(self.model, self.config)
-        lr_scheduler, monitor = utils.build_scheduler(optimizer, self.config)
+        optimizer = kltn_utils.build_optimizer(self.model, self.config)
+        lr_scheduler, monitor = kltn_utils.build_scheduler(optimizer, self.config)
         res = {
             "optimizer": optimizer,
         }
@@ -331,7 +330,7 @@ class BlackBoxTrain(pl.LightningModule):
         }
         test_result["test_time"] = self.test_time
 
-        utils.save_dict_to_json(test_result, f"{const.CP_PATH}/test_result.json")
+        kltn_utils.save_dict_to_json(test_result, f"{const.CP_PATH}/test_result.json")
 
     def test_step(self, batch, batch_idx):
         data, label = batch

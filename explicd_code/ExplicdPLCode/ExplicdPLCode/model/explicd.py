@@ -1,9 +1,11 @@
 import torch
+from kltn_utils import kltn_utils
+from pytorch_lightning.utilities import rank_zero_info
 from torch import nn
 from torch.nn import functional as F
 
 from .. import const
-from . import utils
+from . import utils as model_utils
 
 
 class ExpLICD(nn.Module):
@@ -13,35 +15,23 @@ class ExpLICD(nn.Module):
         config,
     ):
         super().__init__()
-
         self.clip_model_name = config.clip_model
 
-        self.clip_model, self.preprocess_list, tokenizer = utils.build_clip_model(
-            self.clip_model_name
-        )
-        self.clip_model.cuda()
+        self.clip_model, tokenizer = kltn_utils.build_clip_model(self.clip_model_name)
 
         self.concept_keys = list(concept_dict.keys())
 
-        self.concept_token_dict = {}
-        for key in self.concept_keys:
-            prefix = utils.get_prefix(config, key)
-            concept_list = concept_dict[key]
-            prefix_concept_list = [prefix + concept for concept in concept_list]
-            token_concept = tokenizer(prefix_concept_list).cuda()
-
-            self.clip_model.eval()
-            with torch.no_grad():
-                _, concept_feat, _ = self.clip_model(None, token_concept)
-
-            self.concept_token_dict[key] = concept_feat.float()
-
-        self.logit_scale = self.clip_model.logit_scale.exp().detach()
+        rank_zero_info("START CONCEPT FEAT")
+        self.concept_token_dict = model_utils.get_concept_token_dict(
+            self.clip_model_name, concept_dict, config
+        )
+        rank_zero_info("END CONCEPT FEAT")
+        self.logit_scale = torch.tensor(const.LOGIT_SCALE[self.clip_model_name])
 
         self.visual_features = []
         self.hook_list = []
 
-        visual_feature_layer = utils.get_visual_feature_layer(
+        visual_feature_layer = model_utils.get_visual_feature_layer(
             self.clip_model, self.clip_model_name
         )
         self.hook_list.append(visual_feature_layer.register_forward_hook(self.hook_fn))
@@ -58,23 +48,23 @@ class ExpLICD(nn.Module):
         self.cross_attn = nn.MultiheadAttention(
             embed_dim=visual_feature_dim, num_heads=num_heads, batch_first=True
         )
-        self.ffn = utils.FFN(visual_feature_dim, visual_feature_dim * 4)
+        self.ffn = model_utils.FFN(visual_feature_dim, visual_feature_dim * 4)
         self.norm = nn.LayerNorm(visual_feature_dim)
         self.proj = nn.Linear(
             in_features=visual_feature_dim, out_features=concept_dim, bias=False
         )
 
         self.cls_head = nn.Linear(
-            in_features=utils.get_num_concepts(concept_dict),
+            in_features=model_utils.get_num_concepts(concept_dict),
             out_features=len(config.class_names),
         )
 
-        utils.replace_visual_weights_for_clip_model(
+        model_utils.replace_visual_weights_for_clip_model(
             self.clip_model, self.clip_model_name
         )
 
         # requires_grad
-        utils.set_up_grad_for_clip_model(self.clip_model, self.clip_model_name)
+        model_utils.set_up_grad_for_clip_model(self.clip_model, self.clip_model_name)
 
     def hook_fn(self, module, input, output):
         """
@@ -84,14 +74,19 @@ class ExpLICD(nn.Module):
         self.visual_features.append(output)
 
     def forward(self, imgs):
+        device = imgs.device
+        self.logit_scale = self.logit_scale.to(device)
+        self.concept_token_dict = model_utils.dict_to_device(
+            self.concept_token_dict, device
+        )
+
         batch_size = imgs.shape[0]
 
         self.visual_features.clear()
         self.clip_model(imgs, None)
-        img_feat_map = self.visual_features[0][:, 1:, :].float()
+        img_feat_map = self.visual_features[0][:, 1:, :]
 
         visual_tokens = self.visual_tokens.repeat(batch_size, 1, 1)
-
         agg_visual_tokens, _ = self.cross_attn(
             visual_tokens, img_feat_map, img_feat_map
         )

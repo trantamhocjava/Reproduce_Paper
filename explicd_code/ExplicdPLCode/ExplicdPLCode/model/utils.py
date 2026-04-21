@@ -1,18 +1,11 @@
 import timm
-import torch
-from open_clip import create_model_from_pretrained, get_tokenizer
+from kltn_utils import kltn_utils
+from pytorch_lightning import Trainer
 from torch import nn
-from torchvision.transforms import v2
+from torch.utils.data import DataLoader
 
-
-def freeze_module(m):
-    for param in m.parameters():
-        param.requires_grad = False
-
-
-def unfreeze_module(m):
-    for param in m.parameters():
-        param.requires_grad = True
+from .dataset import CustomConceptDataset
+from .train import ConceptFeatGetter
 
 
 class FFN(nn.Module):
@@ -39,59 +32,6 @@ def get_num_concepts(concept_list):
     return res
 
 
-def get_preprocess_list_v2(preprocess):
-    """Transform preprocess from v1 to v2 to speed up training
-
-    Args:
-        preprocess (_type_): preprocess got from open_clip.create_model_from_pretrained
-        allow model_name:
-        - `hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224`
-        - `hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K`
-
-        architecture like:
-        - Resize(size=224, interpolation=bicubic, max_size=None, antialias=True)
-        - CenterCrop(size=(224, 224))
-        - function _convert_to_rgb
-        - ToTensor()
-        - Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
-
-    Returns:
-        list: list of preprocess v2
-    """
-    resize_v1 = preprocess.transforms[0]
-    resize = v2.Resize(
-        size=resize_v1.size,
-        interpolation=resize_v1.interpolation,
-        max_size=resize_v1.max_size,
-        antialias=resize_v1.antialias,
-    )
-
-    center_crop_v1 = preprocess.transforms[1]
-    center_crop = v2.CenterCrop(size=center_crop_v1.size)
-
-    normalize_v1 = preprocess.transforms[-1]
-    normalize = v2.Normalize(mean=normalize_v1.mean, std=normalize_v1.std)
-
-    return [resize, center_crop, v2.ToDtype(torch.float32, scale=True), normalize]
-
-
-def build_clip_model(model_name):
-    model, preprocess = create_model_from_pretrained(model_name)
-    tokenizer = get_tokenizer(model_name)
-    preprocess_list = get_preprocess_list_v2(preprocess)
-
-    return model, preprocess_list, tokenizer
-
-
-def get_visual_feature_layer(model, model_name):
-    if model_name == "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224":
-        visual_feature_layer = model.visual.trunk.blocks[-1]
-    elif model_name == "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K":
-        visual_feature_layer = model.visual.transformer.resblocks[-1]
-
-    return visual_feature_layer
-
-
 def get_prefix(config, key):
     if config.dataset_name == "isic2018":
         prefix = f"the {key} of the lesion is "
@@ -107,17 +47,25 @@ def get_prefix(config, key):
     return prefix
 
 
+def get_visual_feature_layer(model, model_name):
+    if model_name == "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224":
+        visual_feature_layer = model.visual.trunk.blocks[-1]
+    elif model_name == "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K":
+        visual_feature_layer = model.visual.transformer.resblocks[-1]
+
+    return visual_feature_layer
+
+
 def set_up_grad_for_clip_model(model, model_name):
     if model_name == "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224":
-        unfreeze_module(model.visual.trunk)
-        freeze_module(model.text)
-    elif (
-        model_name == "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224"
-    ):
-        unfreeze_module(model.visual)
-        freeze_module(model.token_embedding)
-        freeze_module(model.transformer)
-        freeze_module(model.ln_final)
+        kltn_utils.unfreeze_module(model.visual.trunk)
+        kltn_utils.freeze_module(model.text)
+
+    elif model_name == "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K":
+        kltn_utils.unfreeze_module(model.visual)
+        kltn_utils.freeze_module(model.token_embedding)
+        kltn_utils.freeze_module(model.transformer)
+        kltn_utils.freeze_module(model.ln_final)
 
 
 def replace_visual_weights_for_clip_model(model, clip_model):
@@ -129,3 +77,44 @@ def replace_visual_weights_for_clip_model(model, clip_model):
         vit.head = nn.Identity()
 
         model.visual.trunk.load_state_dict(vit.state_dict())
+
+
+def get_concept_token_dict(clip_model_name, concept_dict, config):
+    clip_model, tokenizer = kltn_utils.build_clip_model(clip_model_name)
+
+    concept_token_dict = {}
+    for key in concept_dict.keys():
+        prefix = get_prefix(config, key)
+        prefix_concept_list = [prefix + concept for concept in concept_dict[key]]
+
+        dataset = CustomConceptDataset(concepts=prefix_concept_list)
+        dataloader = DataLoader(
+            dataset,
+            batch_size=config.batch_size,
+            shuffle=False,
+            num_workers=4,
+            drop_last=False,
+        )
+        concept_feat_getter = ConceptFeatGetter(model=clip_model, tokenizer=tokenizer)
+
+        tester = Trainer(
+            accelerator="gpu",
+            devices=1,
+            precision=32,
+        )
+        tester.test(model=concept_feat_getter, dataloaders=dataloader)
+
+        concept_token_dict[key] = concept_feat_getter.concept_feat
+
+    # start debug
+    for idx, value in enumerate(concept_token_dict.values()):
+        kltn_utils.rank_zero_info_newline(f"{idx}: {value.shape}")
+
+    # end debug
+
+    return concept_token_dict
+
+
+def dict_to_device(dictionary, device):
+    dictionary = {key: value.to(device) for key, value in dictionary.items()}
+    return dictionary

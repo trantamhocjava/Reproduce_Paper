@@ -61,8 +61,10 @@ if __name__ == "__main__":
     uuid = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
     exp_dir = os.path.join("./exp", uuid)
     args.exp_dir = exp_dir
+
     if not os.path.exists(exp_dir):
         os.makedirs(exp_dir)
+
     # load data, return train-val split, traindataset, and test dataloaders
     train_loader, val_loader, test_loader = get_dataset(args)
     args.max_epochs = args.epochs

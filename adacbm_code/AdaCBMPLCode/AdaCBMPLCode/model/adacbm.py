@@ -1,18 +1,9 @@
 import torch
+from kltn_utils import kltn_utils
 from torch import nn
 from torch.nn import functional as F
 
-from .. import utils
 from . import utils as model_utils
-
-
-def get_init_mask(num_class, concept2cls, init_val=1):
-    num_concept = concept2cls.shape[1]
-    concept2cls = torch.from_numpy(concept2cls).long().view(1, -1)
-    init_mask = torch.zeros((num_class, num_concept))
-    init_mask.scatter_(0, concept2cls, init_val)
-
-    return init_mask
 
 
 class AdaptiveModule(nn.Module):
@@ -44,7 +35,7 @@ class AdaCBM(nn.Module):
         super().__init__()
         self.config = config
 
-        self.clip_model, tokenizer = utils.build_clip_model(config.clip_model)
+        self.clip_model, tokenizer = kltn_utils.build_clip_model(config.clip_model)
 
         self.concept_feat = select_concepts_data["select_concept_feat"]
         self.concept2cls = select_concepts_data["select_concept2cls"]
@@ -56,7 +47,7 @@ class AdaCBM(nn.Module):
             num_layers=config.num_layers,
         )
 
-        self.mask = get_init_mask(
+        self.mask = model_utils.get_class2concept(
             len(config.class_names),
             self.concept2cls,
         )
@@ -66,16 +57,23 @@ class AdaCBM(nn.Module):
         self.class_concept_bias = nn.Parameter(torch.zeros(len(config.class_names)))
 
         # Grad
-        model_utils.freeze_module(self.clip_model)
+        kltn_utils.freeze_module(self.clip_model)
+
+    def to_device(self, device):
+        self.mask = self.mask.to(device)
+        self.concept_feat = self.concept_feat.to(device)
 
     def forward(self, imgs):
-        self.clip_model.eval()
-        with torch.no_grad():
-            img_feat = self.clip_model(imgs, None)[0]
+        self.to_device(imgs.device)
+
+        img_feat = kltn_utils.get_img_feat_from_clip_model(
+            self.clip_model, self.config.clip_model, imgs
+        ).to(torch.float32)
+        self.concept_feat = self.concept_feat.to(torch.float32)
 
         mat = self.class_concept_weight * self.mask
-        image_embed = self.adaptive_layer(img_feat)
+        img_feat = self.adaptive_layer(img_feat)
 
-        dot_product = image_embed @ self.concept_feat.t() + self.dot_product_bias
+        dot_product = img_feat @ self.concept_feat.t() + self.dot_product_bias
         class_logit = dot_product @ mat.t() + self.class_concept_bias
-        return class_logit, dot_product
+        return class_logit

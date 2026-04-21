@@ -1,6 +1,7 @@
 import os
 from optparse import OptionParser
 
+from kltn_utils import kltn_utils
 from pytorch_lightning import Trainer
 from pytorch_lightning.utilities import rank_zero_info
 
@@ -11,7 +12,7 @@ from .train import ExplicdTrain
 def main(config):
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
-    utils.seed_everything_in_pl()
+    kltn_utils.seed_everything_in_pl()
 
     os.makedirs(const.CP_PATH, exist_ok=True)
 
@@ -21,11 +22,9 @@ def main(config):
     model = ExplicdTrain(config=config)
 
     rank_zero_info("Load test dataset")
-    img2attr = const.CONCEPT_DATASET_DICT[config.dataset_name]
+    class2concept = const.CONCEPT_DATASET_DICT[config.dataset_name]
 
-    _, _, testLoader = utils.load_train_val_test(
-        config, model.model.preprocess_list, img2attr
-    )
+    _, _, testLoader = utils.load_train_val_test(config, class2concept)
     rank_zero_info("test")
     utils.print_shape_first_batch(testLoader)
 
@@ -38,7 +37,7 @@ def main(config):
     rank_zero_info("Result of best model on testset")
     tester.test(model=model, ckpt_path=config.best_model, dataloaders=testLoader)
 
-    utils.destroy_process_group()
+    kltn_utils.destroy_process_group()
 
     print("Done")
 

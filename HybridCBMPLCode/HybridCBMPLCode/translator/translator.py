@@ -1,0 +1,98 @@
+import torch
+from torch import nn
+from transformers import GPT2Config, GPT2LMHeadModel
+
+from ..clip.simple_tokenizer import SimpleTokenizer
+from . import utils as translator_utils
+
+
+class MLP(nn.Module):
+    def __init__(self, sizes, bias=True, act=nn.Tanh):
+        super(MLP, self).__init__()
+        layers = []
+        for i in range(len(sizes) - 1):
+            layers.append(nn.Linear(sizes[i], sizes[i + 1], bias=bias))
+            if i < len(sizes) - 2:
+                layers.append(act())
+        self.model = nn.Sequential(*layers)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.model(x)
+
+
+class ConceptTranslator(nn.Module):
+    def __init__(self, clip_model_name):
+        super().__init__()
+
+        prefix_size = translator_utils.get_prefix_size(clip_model_name)
+
+        self.decoder = GPT2LMHeadModel(
+            GPT2Config(
+                n_layer=12,
+                n_head=12,
+            )
+        )
+        self.embedding_size = self.decoder.transformer.wte.weight.shape[1]
+        self.clip_project = MLP((prefix_size, self.embedding_size))
+        self.tokenizer = SimpleTokenizer()
+
+    def forward(
+        self, clip_features, gpt_tokens=None, project=True, attention_mask=None
+    ):
+        clip_features = self.clip_project(clip_features)
+        clip_features = clip_features.reshape(-1, 1, self.embedding_size)
+
+        embedding_text = self.decoder.transformer.wte(gpt_tokens)
+        embedding_cat = torch.cat([clip_features, embedding_text], dim=1)
+
+        out = self.decoder(inputs_embeds=embedding_cat, attention_mask=attention_mask)
+        return out, embedding_cat
+
+    def output_to_token(self, output, temperature):
+        logits = output.logits
+        logits = logits[:, -1, :] / (temperature if temperature > 0 else 1.0)  # B, dim
+        logits = torch.nn.functional.softmax(logits, dim=-1)
+        next_token = torch.argmax(logits, -1).unsqueeze(-1)
+        return next_token
+
+    def decode(self, clip_features, entry_length=30, temperature=1, batch_size=128):
+        tokens = []
+        
+        with torch.no_grad():
+            for start in range(0, clip_features.shape[0], batch_size):
+                end = min(start + batch_size, clip_features.shape[0])
+                clip_feature = clip_features[start:end].to(self.device)
+                clip_feature = clip_feature / clip_feature.norm(dim=-1, keepdim=True)
+                outputs, embedding_cat = self.forward(clip_feature, project=True)
+                bc_tokens = []
+                for i in range(entry_length):
+                    next_token = self.output_to_token(outputs, temperature)
+                    outputs, embedding_cat = self.forward(
+                        embedding_cat, next_token, project=False
+                    )
+                    bc_tokens.append(next_token)
+                bc_tokens = torch.cat(bc_tokens, dim=1).cpu()
+                tokens.append(bc_tokens)
+
+        tokens = torch.cat(tokens, dim=0).numpy()
+        output_list = []
+
+        for token_step in list(tokens):
+            output = self.untokenize(token_step)
+            output_list.append(output)
+
+        return output_list if len(output_list) > 1 else output_list[0]
+
+    def untokenize(self, tokens):
+        output = []
+
+        for token in tokens.squeeze():
+            if token > 49407:
+                break
+            output.append(token)
+            if token.item() == 49407:
+                break
+        output = self.tokenizer.decode(output)
+        return (
+            output.replace("<|startoftext|>", "").replace("<|endoftext|>", "").strip()
+        )

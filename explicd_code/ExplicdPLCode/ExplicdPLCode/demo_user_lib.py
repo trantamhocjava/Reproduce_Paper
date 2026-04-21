@@ -1,10 +1,10 @@
 from optparse import OptionParser
 
-from kltn_utils import kltn_utils
+from kltn_utils.kltn_utils import print_demo_user_lib
 
 
 def main(config):
-    kltn_utils.print_demo_user_lib(config.text)
+    print_demo_user_lib(config.text)
 
 
 if __name__ == "__main__":

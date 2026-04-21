@@ -3,10 +3,11 @@ import shutil
 from optparse import OptionParser
 
 import torch
+from kltn_utils import kltn_utils
 from pytorch_lightning import Trainer
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import CSVLogger
-from pytorch_lightning.utilities import rank_zero_info
+from pytorch_lightning.strategies import DDPStrategy
 
 from . import const, utils
 from .train import AdacbmTrain
@@ -14,27 +15,30 @@ from .train import AdacbmTrain
 
 def main(config):
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
-    utils.seed_everything_in_pl()
+    kltn_utils.seed_everything_in_pl()
     os.makedirs(const.CP_PATH, exist_ok=True)
 
     config.class_names = const.CLASS_NAMES[config.dataset_name]
+    config.epochs = config.end_epoch - config.start_epoch + 1
 
-    rank_zero_info("Load model")
+    kltn_utils.rank_zero_info_newline("Load model")
     select_concepts_data = torch.load(
-        config.select_concepts_data_path, map_location="cpu"
+        config.select_concepts_data_path, map_location="cpu", weights_only=False
     )
 
     model = AdacbmTrain(select_concepts_data=select_concepts_data, config=config)
 
-    rank_zero_info("Load train, val dataset")
+    kltn_utils.rank_zero_info_newline("Load train, val dataset")
     trainLoader, valLoader, _ = utils.load_train_val_test(config)
-    rank_zero_info("Train")
+    kltn_utils.rank_zero_info_newline("Train")
     utils.print_shape_first_batch(trainLoader)
-    rank_zero_info("Val")
+    kltn_utils.rank_zero_info_newline("Val")
     utils.print_shape_first_batch(valLoader)
 
     if config.last_state is not None:
-        rank_zero_info(f"Restore last state from {config.last_state}")
+        kltn_utils.rank_zero_info_newline(
+            f"Restore last state from {config.last_state}"
+        )
         ckpt_path = f"{config.last_state}/last.ckpt"
         shutil.copy(f"{config.last_state}/best.ckpt", f"{const.CP_PATH}/best.ckpt")
     else:
@@ -45,7 +49,7 @@ def main(config):
         save_top_k=1,
         save_last=True,
         monitor=config.monitor,
-        mode=utils.get_mode(config.monitor),
+        mode=kltn_utils.get_mode(config.monitor),
         filename="best",
     )
     csv_logger = CSVLogger(save_dir=const.CP_PATH, name="", version=const.CSV_LOGS)
@@ -55,14 +59,14 @@ def main(config):
         devices=2,
         max_epochs=config.end_epoch,
         precision="16-mixed" if config.amp else 32,
-        strategy="ddp",
+        strategy=DDPStrategy(find_unused_parameters=True),
         default_root_dir=const.CP_PATH,
         num_sanity_val_steps=0,
         logger=[csv_logger],
         callbacks=[model_ckpt],
     )
 
-    rank_zero_info("Train Adacbm")
+    kltn_utils.rank_zero_info_newline("Train Adacbm")
     trainer.fit(
         model,
         train_dataloaders=trainLoader,
@@ -70,7 +74,7 @@ def main(config):
         ckpt_path=ckpt_path,
     )
 
-    rank_zero_info("Result of best model on valset")
+    kltn_utils.rank_zero_info_newline("Result of best model on valset")
     tester = Trainer(
         accelerator="gpu",
         devices=1,
@@ -81,16 +85,12 @@ def main(config):
         model=model, ckpt_path=f"{const.CP_PATH}/best.ckpt", dataloaders=valLoader
     )
 
-    rank_zero_info("Done")
+    kltn_utils.rank_zero_info_newline("Done")
 
 
 if __name__ == "__main__":
     parser = OptionParser()
-    parser.add_option(
-        "--select_concepts_data_path",
-        dest="select_concepts_data_path",
-        type="str",
-    )
+
     parser.add_option(
         "--last_state",
         type="str",
@@ -128,22 +128,30 @@ if __name__ == "__main__":
     parser.add_option(
         "--transform", dest="transform", type="str", help="[paper, follow_backbone]"
     )
+    parser.add_option("--clip_model", dest="clip_model", type="str")
+    parser.add_option("--num_layers", dest="num_layers", type="int")
+    parser.add_option(
+        "--select_concepts_data_path",
+        dest="select_concepts_data_path",
+        type="str",
+    )
     parser.add_option("--optimizer", dest="optimizer", default="adamw", type="str")
     parser.add_option(
         "--lr", dest="lr", default=0.0001, type="float", help="learning rate"
     )
     parser.add_option(
-        "--use_scheduler",
-        action="store_true",
-        dest="use_scheduler",
+        "--weight_decay", dest="weight_decay", type="float", help="weight decay"
     )
     parser.add_option(
         "--amp",
         action="store_true",
         dest="amp",
     )
-    parser.add_option("--clip_model", dest="clip_model", type="str")
-    parser.add_option("--num_layers", dest="num_layers", type="int")
+    parser.add_option(
+        "--scheduler",
+        dest="scheduler",
+        type="str",
+    )
 
     (cfg, args) = parser.parse_args()
 

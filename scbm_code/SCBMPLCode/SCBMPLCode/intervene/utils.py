@@ -132,6 +132,7 @@ def _build_constr(constr, x0):
             return LinearOperator((numel, numel), matvec=matvec)
         else:
             x.requires_grad_(True)
+
             with torch.enable_grad():
                 if "jac" in constr:
                     grad = constr["jac"](x)

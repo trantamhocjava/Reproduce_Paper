@@ -1,11 +1,11 @@
-import os.path
+from typing import Tuple
 
 import torch
 import torch.nn as nn
-from transformers import GPT2Config, GPT2LMHeadModel
-from typing import Tuple
-from ..clip.simple_tokenizer import SimpleTokenizer
 from tqdm import tqdm
+from transformers import GPT2Config, GPT2LMHeadModel
+
+from ..clip.simple_tokenizer import SimpleTokenizer
 
 
 class MLP(nn.Module):
@@ -24,48 +24,52 @@ class MLP(nn.Module):
 
 class ConceptTranslator(nn.Module):
     def __init__(self, clip_model=None, prefix_size: int = 512):
-        super(ConceptTranslator, self).__init__()
-        if clip_model == 'ViT-L/14':
+        super().__init__()
+        if clip_model == "ViT-L/14":
             prefix_size = 768
-        elif clip_model == 'ViT-B/32':
+        elif clip_model == "ViT-B/32":
             prefix_size = 512
         else:
             prefix_size = 1024
+
         self.clip_model = clip_model
-        self.decoder = GPT2LMHeadModel(GPT2Config(
-            n_layer=12,
-            n_head=12,
-        ))
+        self.decoder = GPT2LMHeadModel(
+            GPT2Config(
+                n_layer=12,
+                n_head=12,
+            )
+        )
         self.embedding_size = self.decoder.transformer.wte.weight.shape[1]
         self.clip_project = MLP((prefix_size, self.embedding_size))
         self.tokenizer = SimpleTokenizer()
 
     @property
     def device(self):
-        # 检查是否有参数
         if next(self.parameters(), None) is not None:
             return next(self.parameters()).device
-        # 检查是否有缓冲区
         elif next(self.buffers(), None) is not None:
             return next(self.buffers()).device
         else:
-            # 默认返回CPU
-            return torch.device('cpu')
+            return torch.device("cpu")
 
-    def load(self, weight_path='weights/translators'):
-        checkpoint = torch.load(weight_path, map_location='cpu', weights_only=True)
+    def load(self, weight_path="weights/translators"):
+        checkpoint = torch.load(weight_path, map_location="cpu", weights_only=True)
         self.load_state_dict(checkpoint)
         self.eval()
 
-    def forward(self, clip_features, gpt_tokens=None, project=True, attention_mask=None):
+    def forward(
+        self, clip_features, gpt_tokens=None, project=True, attention_mask=None
+    ):
         if project:
             clip_features = self.clip_project(clip_features)
             clip_features = clip_features.reshape(-1, 1, self.embedding_size)
+
         if gpt_tokens is not None:
             embedding_text = self.decoder.transformer.wte(gpt_tokens)
             embedding_cat = torch.cat([clip_features, embedding_text], dim=1)
         else:
             embedding_cat = clip_features
+
         out = self.decoder(inputs_embeds=embedding_cat, attention_mask=attention_mask)
         return out, embedding_cat
 
@@ -87,7 +91,9 @@ class ConceptTranslator(nn.Module):
             bc_tokens = []
             for i in range(entry_length):
                 next_token = self.output_to_token(outputs, temperature)
-                outputs, embedding_cat = self.forward(embedding_cat, next_token, project=False)
+                outputs, embedding_cat = self.forward(
+                    embedding_cat, next_token, project=False
+                )
                 bc_tokens.append(next_token)
             bc_tokens = torch.cat(bc_tokens, dim=1).cpu()
             tokens.append(bc_tokens)
@@ -107,4 +113,6 @@ class ConceptTranslator(nn.Module):
             if token.item() == 49407:
                 break
         output = self.tokenizer.decode(output)
-        return output.replace('<|startoftext|>', '').replace('<|endoftext|>', '').strip()
+        return (
+            output.replace("<|startoftext|>", "").replace("<|endoftext|>", "").strip()
+        )

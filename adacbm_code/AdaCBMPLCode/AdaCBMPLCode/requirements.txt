@@ -16,3 +16,4 @@ pandas
 tensorboard
 open-clip-torch
 git+https://github.com/openai/CLIP.git
+git+https://github.com/trantamhocjava/kltn_utils.git

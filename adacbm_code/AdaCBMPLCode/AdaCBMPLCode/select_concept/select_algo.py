@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+from kltn_utils import kltn_utils
 from scipy.stats import ttest_ind
 
 
@@ -10,18 +11,29 @@ def utility_function(
     num_concepts_per_cls,
     gamma,
 ):
-    i = 0
+    start_idx = 0
+
+    # TODO: HOT FIX
+    if kltn_utils.is_data_type(pearson_values, "float"):
+        pearson_values = np.array([[pearson_values]])
+
+    # END HOT FIX
+
     if gamma > 1.0 or gamma < 0:
         return selected_indices
+
     while len(selected_indices) < num_concepts_per_cls:
-        t = cls_selected_feature_indices[i]
+        t = cls_selected_feature_indices[start_idx]
         selected_indices.append(t)
-        R = list(np.argwhere(pearson_values[i, :] > gamma).flatten())
+
+        R = list(np.argwhere(pearson_values[start_idx, :] > gamma).flatten())
+
         if num_concepts_per_cls - len(selected_indices) <= len(
             cls_selected_feature_indices
         ) - len(R):
             cls_selected_feature_indices = np.delete(cls_selected_feature_indices, R)
             idx = list(set(range(pearson_values.shape[0])).difference(R))
+
             pearson_values = pearson_values[np.ix_(idx, idx)]
         else:
             selected_indices = utility_function(
@@ -37,20 +49,20 @@ def utility_function(
 
 def select_features(
     dot_product,
-    y,
+    class_labels,
     selected_concept2cls,
-    num_concepts_per_cls=350,
-    pearson_weight=0.9,
+    num_concepts_per_cls,
+    pearson_weight,
 ):
-    classes = y.unique()
+    classes = class_labels.unique()
 
     all_t_stats = []
 
     for cls in classes.numpy():
         indices = (selected_concept2cls == cls).nonzero(as_tuple=True)[0]
         for i in indices:
-            v_c = dot_product[y == cls, i].numpy()
-            v_c1 = dot_product[y != cls, i].numpy()
+            v_c = dot_product[class_labels == cls, i].numpy()
+            v_c1 = dot_product[class_labels != cls, i].numpy()
             result = ttest_ind(v_c, v_c1, equal_var=False, alternative="greater")
             all_t_stats.append(result.statistic)
 
@@ -67,10 +79,13 @@ def select_features(
         ]  # [:num_concept_per_class]
         features0 = np.array(
             [
-                dot_product[y == cls_id, idx].numpy()
+                dot_product[class_labels == cls_id, idx].numpy()
                 for idx in cls_selected_feature_indices
             ]
         )
+        if features0.ndim == 1:
+            features0 = features0.reshape(-1, 1)
+
         R1 = np.corrcoef(features0)
         R1 = np.absolute(R1)
 
@@ -86,6 +101,12 @@ def select_features(
             selected_features_indices2, np.array(selected_indices)
         )
 
+    # TODO: HOT FIX
+    selected_features_indices2 = selected_features_indices2[
+        selected_features_indices2 != None
+    ]
+    # END HOT FIX
+
     selected_features_indices2 = np.sort(selected_features_indices2).astype(int)
 
     return selected_features_indices2, p_values
@@ -95,12 +116,14 @@ def paper_selection(
     img_feat,
     concept_feat,
     concept2cls,
-    num_concepts,
+    num_select_concepts,
     num_images_per_class,
     pearson_weight,
 ):
     num_cls = len(num_images_per_class)
-    num_concepts_per_cls = int(np.ceil(num_concepts / num_cls))
+    num_concepts_per_cls = int(np.ceil(num_select_concepts / num_cls))
+
+    # sort concept2cls and concept_feat in ascending order by class index
     sorted_concept2cls_idx = np.argsort(concept2cls)
     sorted_concept2cls = torch.from_numpy(concept2cls[sorted_concept2cls_idx])
     sorted_concept_feat = concept_feat[torch.from_numpy(sorted_concept2cls_idx), :]
@@ -122,7 +145,7 @@ def paper_selection(
     # select features algorithm
     selected_idx, _ = select_features(
         dot_product=dot_product,
-        y=class_labels,
+        class_labels=class_labels,
         selected_concept2cls=sorted_concept2cls,
         num_concepts_per_cls=num_concepts_per_cls,
         pearson_weight=pearson_weight,

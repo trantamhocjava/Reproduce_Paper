@@ -11,7 +11,7 @@ from .train import ConceptFeatGetter, ImgFeatGetter
 
 def get_num_images_per_class(config):
     num_images_per_class = [
-        len(os.listdir(f"{config.dataset_dir}/{class_name}"))
+        len(os.listdir(f"{config.dataset_dir}/train/{class_name}"))
         for class_name in config.class_names
     ]
 
@@ -29,7 +29,7 @@ def prepare_img_feat(model, transform, config):
         num_workers=4,
         drop_last=False,
     )
-    img_feat_getter = ImgFeatGetter(model=model)
+    img_feat_getter = ImgFeatGetter(model=model, model_name=config.clip_model)
 
     tester = Trainer(
         accelerator="gpu",
@@ -58,7 +58,7 @@ def get_all_concepts_and_concept2cls(config):
 
     all_concepts = np.array(all_concepts)
 
-    return all_concepts, concept2cls, num_concept
+    return all_concepts, concept2cls
 
 
 def has_pattern(concepts, pattern):
@@ -72,7 +72,7 @@ def check_no_cls_names(concepts, cls_names):
     res = np.ones(len(concepts), dtype=bool)
 
     for cls_name in cls_names:
-        no_cls_name = not has_pattern(concepts, cls_name)
+        no_cls_name = ~has_pattern(concepts, cls_name)
         res = res & no_cls_name
 
     return res
@@ -85,10 +85,10 @@ def preprocess_concept(concepts, config, concept2cls):
     This function checks all input concepts, remove duplication, and
     remove class names if necessary
     """
-    _, left_idx = np.unique(concepts, return_index=True)
+    unique_concepts, unique_idx = np.unique(concepts, return_index=True)
+    is_good = check_no_cls_names(unique_concepts, config.class_names)
 
-    is_good = check_no_cls_names(concepts, config.class_names)
-    left_idx = left_idx[is_good]
+    left_idx = unique_idx[is_good]
 
     concepts = concepts[left_idx]
     concept2cls = concept2cls[left_idx]
@@ -96,8 +96,8 @@ def preprocess_concept(concepts, config, concept2cls):
     return concepts, concept2cls
 
 
-def prepare_txt_feat(model, all_concepts, config, tokenizer):
-    dataset = CustomConceptDataset(concepts=all_concepts, tokenizer=tokenizer)
+def prepare_concept_feat(model, all_concepts, config, tokenizer):
+    dataset = CustomConceptDataset(concepts=all_concepts)
     dataloader = DataLoader(
         dataset,
         batch_size=config.batch_size,
@@ -105,7 +105,11 @@ def prepare_txt_feat(model, all_concepts, config, tokenizer):
         num_workers=4,
         drop_last=False,
     )
-    concept_feat_getter = ConceptFeatGetter(model=model)
+    concept_feat_getter = ConceptFeatGetter(
+        model=model,
+        model_name=config.clip_model,
+        tokenizer=tokenizer,
+    )
 
     tester = Trainer(
         accelerator="gpu",

@@ -3,10 +3,11 @@ import time
 import numpy as np
 import pytorch_lightning as pl
 import torch
+from kltn_utils import kltn_utils
 from sklearn import metrics
 from torch.nn import functional as F
 
-from . import const, utils
+from . import const
 from .model.adacbm import AdaCBM
 
 
@@ -81,8 +82,8 @@ class AdacbmTrain(pl.LightningModule):
 
     # define optimizers and schedulers
     def configure_optimizers(self):
-        optimizer = utils.build_optimizer(self.model, self.config)
-        lr_scheduler, monitor = utils.build_scheduler(optimizer, self.config)
+        optimizer = kltn_utils.build_optimizer(self.model, self.config)
+        lr_scheduler, monitor = kltn_utils.build_scheduler(optimizer, self.config)
         res = {
             "optimizer": optimizer,
         }
@@ -95,7 +96,9 @@ class AdacbmTrain(pl.LightningModule):
 
         return res
 
-    def get_loss(self, data, label):
+    def get_loss(self, batch):
+        data, label = batch
+
         # Forward pass
         label_logits = self.model(data)
 
@@ -103,16 +106,14 @@ class AdacbmTrain(pl.LightningModule):
         loss_cls = F.cross_entropy(label_logits, label)
         loss = loss_cls
 
-        return loss, loss_cls, label_logits
+        return loss, loss_cls, label_logits, label
 
     def on_train_epoch_start(self):
         self.train_metric.reset()
         self.epoch_time = time.time()
 
     def training_step(self, batch, batch_idx):
-        data, label = batch
-
-        loss, loss_cls, label_logit = self.get_loss(data, label)
+        loss, loss_cls, label_logit, label = self.get_loss(batch)
 
         # Update loss and metric
         self.train_metric.update(
@@ -137,9 +138,7 @@ class AdacbmTrain(pl.LightningModule):
         )
 
     def validation_step(self, batch, batch_idx):
-        data, label = batch
-
-        loss, loss_cls, label_logit = self.get_loss(data, label)
+        loss, loss_cls, label_logit, label = self.get_loss(batch)
 
         # Update loss and metric
         self.val_metric.update(
@@ -161,12 +160,10 @@ class AdacbmTrain(pl.LightningModule):
         }
         test_result["test_time"] = self.test_time
 
-        utils.save_dict_to_json(test_result, f"{const.CP_PATH}/test_result.json")
+        kltn_utils.save_dict_to_json(test_result, f"{const.CP_PATH}/test_result.json")
 
     def test_step(self, batch, batch_idx):
-        data, label = batch
-
-        loss, loss_cls, label_logit = self.get_loss(data, label)
+        loss, loss_cls, label_logit, label = self.get_loss(batch)
 
         # Update loss and metric
         self.test_metric.update(

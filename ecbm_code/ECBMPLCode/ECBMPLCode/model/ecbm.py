@@ -165,6 +165,7 @@ class EBM_GL(nn.Module):
         c_embed = self.c_embedding.unsqueeze(0)  # [1,concept_size, hidden_size]
         c_embed = c_embed.repeat(bs, 1, 1)  # [bs,concept_size,hidden_size]
         c_embed_cy = c_embed
+
         if not is_training:
             c_prob = self.c_prob
             c_prob = self.smx_c(c_prob)

@@ -1,19 +1,8 @@
-import torch
-from torchvision.transforms import v2
+from . import concept_dataset
 
-import concept_dataset
-
-SEEDING = 42
 CP_PATH = "/kaggle/working/checkpoint"
 CSV_LOGS = "csv_logs"
-METRIC_MAX = ("val_c_acc_overall", "val_c_acc", "val_y_acc", "val_y_bmac")
 
-PREPROCESS_LIST = [
-    v2.Resize(size=224, interpolation="bicubic", max_size=None, antialias=True),
-    v2.CenterCrop(size=(224, 224)),
-    v2.ToDtype(torch.float32, scale=True),
-    v2.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5]),
-]
 
 CONCEPT_DATASET_DICT = {
     "isic2018": concept_dataset.explicid_isic_dict,
@@ -37,6 +26,10 @@ CLASS_NAMES = {
     ],
 }
 
+LOGIT_SCALE = {
+    "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224": 85.2323,
+    "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K": 99.998,
+}
 
 LATENT_DIM = {
     "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224": (768, 512, 12),
@@ -95,7 +88,6 @@ CLASS2CONCEPT = {
         [3, 3, 3, 3, 3, 5, 4],
     ],
     "lcc": [
-        # [organ_context, overall_architecture, cytologic_atypia, mitotic_activity, necrosis, mucin_features, squamous_differentiation]
         [0, 0, 2, 2, 1, 1, 0],  # Colon adenocarcinoma
         [0, 3, 0, 0, 0, 1, 0],  # Colon benign tissue
         [1, 1, 1, 1, 0, 1, 0],  # Lung adenocarcinoma

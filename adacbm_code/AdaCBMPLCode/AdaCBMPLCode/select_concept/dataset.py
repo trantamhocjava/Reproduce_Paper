@@ -1,8 +1,7 @@
 import os
 
+from kltn_utils import kltn_utils
 from torch.utils.data import Dataset
-
-from .. import utils
 
 
 class CustomImageDataset(Dataset):
@@ -26,7 +25,7 @@ class CustomImageDataset(Dataset):
         file_path = self.file_paths[idx]
         label = int(self.labels[idx])
 
-        img = utils.read_img(file_path)
+        img = kltn_utils.read_img(file_path)
 
         if self.transforms is not None:
             img = self.transforms(img)
@@ -35,9 +34,8 @@ class CustomImageDataset(Dataset):
 
 
 class CustomConceptDataset(Dataset):
-    def __init__(self, concepts, tokenizer):
+    def __init__(self, concepts):
         self.concepts = concepts
-        self.tokenizer = tokenizer
 
     def __len__(self):
         return len(self.concepts)
@@ -45,6 +43,4 @@ class CustomConceptDataset(Dataset):
     def __getitem__(self, idx):
         concept = self.concepts[idx]
 
-        concept_token = self.tokenizer(concept)
-
-        return concept_token
+        return concept
