@@ -2,6 +2,7 @@ import glob
 import os
 
 import torch
+from dataset.dataloader import DataBank
 from lightning.pytorch import seed_everything
 from lightning.pytorch.callbacks import (
     LearningRateMonitor,
@@ -9,12 +10,11 @@ from lightning.pytorch.callbacks import (
     TQDMProgressBar,
 )
 from lightning.pytorch.trainer import Trainer
-
-from datasets.dataloader import DataBank
 from models.cbm.linearCBM import LinearCBM
 from models.clip import ClipEncoder
-from models.conceptBank.hybrid_bank import HybridConceptBank
 from utils.config import get_args
+
+from models.conceptBank.hybrid_bank import HybridConceptBank
 
 SEED = 42
 

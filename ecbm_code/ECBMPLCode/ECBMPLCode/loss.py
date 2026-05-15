@@ -10,7 +10,6 @@ class EBMLoss_label(nn.Module):
         self.class_list = class_list
 
     def forward(self, energy, gt):
-
         batch_size = energy.size(0)
         y_tem = (
             torch.tensor([self.class_list.index(tem) for tem in gt]).long().to(DEVICE)
@@ -32,6 +31,7 @@ class EBMLoss_concept(nn.Module):
     def forward(self, energy, gt):
         y_tem = gt.unsqueeze(-1).to(torch.int64)
         cpt_loss = torch.zeros([]).to(DEVICE)
+
         for i in range(energy.shape[1]):
             energy_pos = energy[:, i : i + 1].gather(dim=2, index=y_tem[:, i : i + 1])
             partition_estimate = -1 * energy[:, i : i + 1]

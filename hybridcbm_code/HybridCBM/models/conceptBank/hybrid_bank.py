@@ -97,6 +97,7 @@ class HybridConceptBank(torch.nn.Module):
 
     def initialize(self, img_features=None, num_images_per_class=None, captions=None):
         self.static_bank.initialize(img_features, num_images_per_class)
+
         if captions is not None:
             captions_embeddings = self.clip_encoder.encode_text(
                 captions, batch_size=128
@@ -177,6 +178,7 @@ class HybridConceptBank(torch.nn.Module):
             raise NotImplementedError
         else:
             raise NotImplementedError
+
         return init_weight
 
 

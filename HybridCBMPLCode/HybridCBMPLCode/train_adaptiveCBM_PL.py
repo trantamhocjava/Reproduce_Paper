@@ -1,19 +1,23 @@
-import torch
-import os
 import glob
+import os
 
+import torch
+from dataset.dataloader import DataBank
 from lightning.pytorch import seed_everything
-from lightning.pytorch.callbacks import ModelCheckpoint, TQDMProgressBar, LearningRateMonitor
-from lightning.pytorch.callbacks import Callback
+from lightning.pytorch.callbacks import (
+    LearningRateMonitor,
+    ModelCheckpoint,
+    TQDMProgressBar,
+)
 from lightning.pytorch.trainer import Trainer
-from lightning.pytorch.loggers import TensorBoardLogger
-from datasets.dataloader import DataBank
-from models.clip import ClipEncoder
-from models.conceptBank.hybrid_bank import HybridConceptBank
 from models.cbm.adaptiveCBM import AdaptiveCBM
+from models.clip import ClipEncoder
 from utils.config import get_args
 
+from models.conceptBank.hybrid_bank import HybridConceptBank
+
 SEED = 42
+
 
 def get_datamodule_fromconfig(config, clip_encoder=None):
     if clip_encoder is None:
@@ -65,34 +69,34 @@ def init_data_bank(config, captions):
     concept_bank.to(torch.device(config.device))
     return concept_bank, datamodule
 
+
 def load_checkpoint(config):
-    checkpoint_dir = config.exp_root.joinpath('checkpoints')
+    checkpoint_dir = config.exp_root.joinpath("checkpoints")
     if config.use_last_ckpt:
-        checkpoints = glob.glob(os.path.join(checkpoint_dir, '*.ckpt'))
+        checkpoints = glob.glob(os.path.join(checkpoint_dir, "*.ckpt"))
         if not checkpoints:
             print(f"No checkpoints found in {checkpoint_dir}")
             return None
         checkpoint_path = max(checkpoints, key=os.path.getctime)
     else:
-        checkpoints = glob.glob(os.path.join(checkpoint_dir, '*val_acc*.ckpt'))
+        checkpoints = glob.glob(os.path.join(checkpoint_dir, "*val_acc*.ckpt"))
         if not checkpoints:
             print(f"No checkpoints found in {checkpoint_dir}")
             return None
 
         def get_val_acc(ckpt):
             filename = os.path.basename(ckpt)
-            val_acc = filename.split('val_acc=')[-1].split('.ckpt')[0].split('-')[0]
+            val_acc = filename.split("val_acc=")[-1].split(".ckpt")[0].split("-")[0]
             return float(val_acc)
 
         checkpoint_path = max(checkpoints, key=get_val_acc)
         return checkpoint_path
-    
 
 
 def main():
-    config= get_args()
+    config = get_args()
     seed_everything(SEED)
-    
+
     if config.test:
         concept_bank, datamodule = init_data_bank(config, captions=None)
 
@@ -101,16 +105,22 @@ def main():
             print("No checkpoint found. Exiting.")
             return
 
-        model = AdaptiveCBM.load_from_checkpoint(checkpoint_path, map_location=torch.device(config.device), config = config, conceptbank=concept_bank, strict = False)
+        model = AdaptiveCBM.load_from_checkpoint(
+            checkpoint_path,
+            map_location=torch.device(config.device),
+            config=config,
+            conceptbank=concept_bank,
+            strict=False,
+        )
         model.to(config.device)
         model.eval()
         trainer = Trainer(
-            devices = [0],
-            callbacks = [TQDMProgressBar(refresh_rate = 1)],
-            default_root_dir = config.exp_root,
+            devices=[0],
+            callbacks=[TQDMProgressBar(refresh_rate=1)],
+            default_root_dir=config.exp_root,
         )
         print("Testing the model...")
-        trainer.test(model, datamodule = datamodule)
+        trainer.test(model, datamodule=datamodule)
 
     else:
         project_name = config.dataset
@@ -118,29 +128,33 @@ def main():
         model = AdaptiveCBM(config, concept_bank)
 
         check_interval = 10
-        checkpoint_dir = config.exp_root.joinpath('checkpoints')
+        checkpoint_dir = config.exp_root.joinpath("checkpoints")
 
         checkpoint_callback = ModelCheckpoint(
-            dirpath = checkpoint_dir,
-            filename = "{epoch}-{step}-{val_acc:.4f}",
-            monitor = 'val_acc',
-            mode = 'max',
-            save_top_k = 3,
-            every_n_epochs = check_interval
+            dirpath=checkpoint_dir,
+            filename="{epoch}-{step}-{val_acc:.4f}",
+            monitor="val_acc",
+            mode="max",
+            save_top_k=3,
+            every_n_epochs=check_interval,
         )
 
         trainer = Trainer(
-            accelerator = "auto",
-            devices = [0],
-            callbacks = [checkpoint_callback, TQDMProgressBar(refresh_rate = 1), LearningRateMonitor()],
-            check_val_every_n_epoch = check_interval,
-            default_root_dir = config.exp_root,
-            max_epochs = config.max_epochs,
-            log_every_n_steps = 10
+            accelerator="auto",
+            devices=[0],
+            callbacks=[
+                checkpoint_callback,
+                TQDMProgressBar(refresh_rate=1),
+                LearningRateMonitor(),
+            ],
+            check_val_every_n_epoch=check_interval,
+            default_root_dir=config.exp_root,
+            max_epochs=config.max_epochs,
+            log_every_n_steps=10,
         )
         print("Training the model...")
-        trainer.fit(model, datamodule =datamodule, ckpt_path = load_checkpoint(config))
-    
+        trainer.fit(model, datamodule=datamodule, ckpt_path=load_checkpoint(config))
+
+
 if __name__ == "__main__":
     main()
-

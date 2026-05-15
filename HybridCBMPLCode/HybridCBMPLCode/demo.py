@@ -1,27 +1,38 @@
-def configure_optimizers(self):
-    optimizer = kltn_utils.build_optimizer(self.translator, self.config)
-    lr_scheduler, monitor = get_linear_schedule_with_warmup(
-        optimizer,  # Optimizer đang sử dụng (ví dụ: AdamW)
-        num_warmup_steps=0,  # Số bước warmup (thường là khoảng 0-10% tổng số bước huấn luyện)
-        num_training_steps=1000,  # Tổng số bước huấn luyện (epoch * bước / batch)
-    )
-    res = {
-        "optimizer": optimizer,
-    }
+class HybridCBMTrain(pl.LightningModule):
+    def __init__(self, config, select_concept_data):
+        super().__init__()
 
-    if lr_scheduler is not None:
-        res["lr_scheduler"] = lr_scheduler
+        self.config = config
 
-    if monitor is not None:
-        res["monitor"] = monitor
+        # Model
+        self.hybrid_bank = HybridConceptBank(config, select_concept_data)
+        self.hybridcbm = HybridCBM(
+            config=config, concept_feat=self.hybrid_bank.concept_feat
+        )
 
-    return res
+    # define optimizers and schedulers
+    def configure_optimizers(self):
+        optimizer_dynamic_concept = kltn_utils.build_optimizer(
+            self.hybrid_bank.dynamic_bank,
+            self.config.optimizer_dynamic_concept,
+        )
+        optimizer_hybridcbm = kltn_utils.build_optimizer(
+            self.hybridcbm,
+            self.config.optimizer_hybridcbm,
+        )
 
+        return [optimizer_dynamic_concept, optimizer_hybridcbm]
 
-class MetricCalculator:
-    def reset(self):
-        self.loss = 0
-        self.loss_token = 0
-        self.epoch_acc = 0
+    def training_step(self, batch, batch_idx):
+        result = self.get_loss(batch)
 
-        self.n_batchs = 0
+        # Update optimizer
+        self.manual_backward(result["loss"])
+
+        opt_dynamic_concept, opt_classifier = self.optimizers()
+
+        kltn_utils.update_optimizer(opt_dynamic_concept)
+        kltn_utils.update_optimizer(opt_classifier)
+
+        # Update loss and metric
+        self.train_metric.update(result)

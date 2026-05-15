@@ -34,7 +34,7 @@ def main(config):
         precision=32,
     )
 
-    kltn_utils.rank_zero_info_newline("Result of best model on testset")
+    kltn_utils.rank_zero_info_newline("Test model")
     tester.test(model=model, ckpt_path=config.best_model, dataloaders=testLoader)
 
     print("Done")
@@ -75,6 +75,6 @@ if __name__ == "__main__":
         help="[paper, follow_backbone, uniform]",
     )
 
-    (cfg, args) = parser.parse_args()
+    cfg, args = parser.parse_args()
 
     main(cfg)

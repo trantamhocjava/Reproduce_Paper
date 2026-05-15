@@ -1,181 +1,197 @@
 import time
 
-import numpy as np
 import pytorch_lightning as pl
 import torch
-from kltn_utils import kltn_utils
-from sklearn import metrics
-from torch.nn import functional as F
+import torch.nn as nn
+from kltn_utils import kltn_class, kltn_utils
 
-from . import const
-
-
-class MetricCalculator:
-    def __init__(self):
-        self.y_pred = torch.tensor([])
-        self.y_true = torch.tensor([])
-
-        self.loss = 0
-        self.loss_cls = 0
-
-        self.n_batchs = 0
-
-    def update(self, y_logit, y_true, loss, loss_cls):
-        self.n_batchs += 1
-
-        y_pred = torch.argmax(y_logit.detach(), dim=1)
-
-        self.y_pred = torch.cat((self.y_pred, y_pred.cpu()), 0)
-        self.y_true = torch.cat((self.y_true, y_true.cpu()), 0)
-
-        self.loss += loss.item()
-        self.loss_cls += loss_cls.item()
-
-    def return_metrics(self):
-        y_acc = metrics.accuracy_score(self.y_true.numpy(), self.y_pred.numpy()) * 100
-        y_bmac = (
-            metrics.balanced_accuracy_score(self.y_true.numpy(), self.y_pred.numpy())
-            * 100
-        )
-
-        loss = self.loss / self.n_batchs
-        loss_cls = self.loss_cls / self.n_batchs
-
-        return {
-            "y_acc": y_acc,
-            "y_bmac": y_bmac,
-            "loss": loss,
-            "loss_cls": loss_cls,
-        }
-
-    def reset(self):
-        self.y_pred = torch.tensor([])
-        self.y_true = torch.tensor([])
-
-        self.loss = 0
-        self.loss_cls = 0
-
-        self.n_batchs = 0
-
-    def get_concept_accuracy(self, c_true, c_pred):
-        return (c_true == c_pred).mean() * 100
-
-    def get_overall_concept_accuracy(self, c_true, c_pred):
-        return np.mean(np.all(c_true == c_pred, axis=1)) * 100
+from ... import const
+from ...loss.alignment import SinkhornDistanceLoss
+from ...loss.regularization import (
+    DiscriminabilityLoss,
+    OrthogonalityLoss,
+)
+from ..conceptBank.hybrid_bank import HybridConceptBank
+from .hybridcbm import HybridCBM
 
 
 class HybridCBMTrain(pl.LightningModule):
-    def __init__(self, config, concept_bank):
+    def __init__(self, config, select_concept_data):
         super().__init__()
 
         self.config = config
-        self.concept_bank = concept_bank
 
         # Model
-        self.model = HybridCBM(config)
+        self.hybrid_bank = HybridConceptBank(config, select_concept_data)
+        self.hybridcbm = HybridCBM(
+            config=config, concept_feat=self.hybrid_bank.concept_feat
+        )
 
-        #
+        # Loss
+        self.cls_loss = torch.nn.CrossEntropyLoss()
+        self.discri_loss = DiscriminabilityLoss()
+        self.ortho_loss = OrthogonalityLoss(num_class=config.num_class)
+        self.align_loss = SinkhornDistanceLoss()
+        self.concept_loss = nn.BCEWithLogitsLoss(reduction="mean")
 
         # Metric
-        self.train_metric = MetricCalculator()
-        self.val_metric = MetricCalculator()
-        self.test_metric = MetricCalculator()
+        self.train_metric = kltn_class.MetricCalculator()
+        self.val_metric = kltn_class.MetricCalculator()
+        self.test_metric = kltn_class.MetricCalculator()
+
+        # off auto optimization
+        self.automatic_optimization = False
 
     # define optimizers and schedulers
     def configure_optimizers(self):
-        optimizer = kltn_utils.build_optimizer(self.model, self.config)
-        lr_scheduler, monitor = kltn_utils.build_scheduler(optimizer, self.config)
-        res = {
-            "optimizer": optimizer,
-        }
+        optimizer_dynamic_concept = kltn_utils.build_optimizer(
+            self.hybrid_bank.dynamic_bank,
+            self.config.optimizer_dynamic_concept,
+        )
+        optimizer_hybridcbm = kltn_utils.build_optimizer(
+            self.hybridcbm,
+            self.config.optimizer_hybridcbm,
+        )
 
-        if lr_scheduler is not None:
-            res["lr_scheduler"] = lr_scheduler
+        return optimizer_dynamic_concept, optimizer_hybridcbm
 
-        if monitor is not None:
-            res["monitor"] = monitor
+    def train_concept(self, img_feat, label):
+        discri_loss = self.discri_loss(
+            img_feat,
+            self.hybrid_bank.concept_feat,
+            label,
+            self.hybrid_bank.static_bank.class_feat,
+        )
 
-        return res
+        ort_loss = self.ortho_loss(
+            self.hybrid_bank.dynamic_bank.concept_feat,
+            self.hybrid_bank.static_bank.concept_feat,
+        )
+
+        # align loss, should not normalize the concept feature
+        align_loss = self.align_loss(
+            self.hybrid_bank.dynamic_bank.concept_feat,
+            self.hybrid_bank.static_bank.concept_feat,
+        )
+
+        return discri_loss, ort_loss, align_loss
+
+    def train_hybridcbm(self, image, label, concept):
+        label_logits, img_feat, concept_logits = self.hybridcbm(image)
+
+        cls_loss = self.cls_loss(label_logits, label)
+        concept_loss = self.concept_loss(concept_logits, concept)
+
+        # loss regularize weight of self.hybridcbm.classifier
+        classifier_weight_loss = torch.linalg.vector_norm(
+            self.hybridcbm.classifier.weight, ord=1, dim=-1
+        ).mean()
+
+        return (
+            cls_loss,
+            classifier_weight_loss,
+            concept_loss,
+            label_logits,
+            img_feat,
+            concept_logits,
+        )
 
     def get_loss(self, batch):
-        data, label = batch
+        image, label, concept = batch
 
-        # Forward pass
-        label_logits = self.model(data)
+        # train classifier
+        (
+            cls_loss,
+            classifier_weight_loss,
+            concept_loss,
+            label_logits,
+            img_feat,
+            concept_logits,
+        ) = self.train_hybridcbm(image, label, concept)
 
-        # Compute the loss
-        loss_cls = F.cross_entropy(label_logits, label)
-        loss = loss_cls
+        # train concept
+        (
+            discri_loss,
+            ort_loss,
+            align_loss,
+        ) = self.train_concept(img_feat, label)
 
-        return loss, loss_cls, label_logits, label
+        # final loss
+        loss = (
+            discri_loss * self.config.loss.lambda_discri
+            + ort_loss * self.config.loss.lambda_ort
+            + align_loss * self.config.loss.lambda_align
+            + cls_loss * self.config.loss.lambda_cls
+            + classifier_weight_loss * self.config.loss.lambda_classifier_weight
+        )
+
+        return {
+            "y": label,
+            "y_logits": label_logits,
+            "c": concept,
+            "c_logits": concept_logits,
+            "loss": loss,
+            "discri_loss": discri_loss,
+            "ort_loss": ort_loss,
+            "align_loss": align_loss,
+            "class_loss": cls_loss,
+            "concept_loss": concept_loss,
+        }
 
     def on_train_epoch_start(self):
-        self.train_metric.reset()
-        self.epoch_time = time.time()
+        self.train_metric.reset(kltn_utils.deepcopy_obj(const.LOSS_DICT))
+        self.val_metric.reset(kltn_utils.deepcopy_obj(const.LOSS_DICT))
+        self.start_time = time.time()
 
     def training_step(self, batch, batch_idx):
-        loss, loss_cls, label_logit, label = self.get_loss(batch)
+        result = self.get_loss(batch)
+
+        # Update optimizer
+        self.manual_backward(result["loss"])
+
+        opt_dynamic_concept, opt_classifier = self.optimizers()
+
+        kltn_utils.update_optimizer(opt_dynamic_concept)
+        kltn_utils.update_optimizer(opt_classifier)
 
         # Update loss and metric
-        self.train_metric.update(
-            label_logit,
-            label,
-            loss,
-            loss_cls,
-        )
-
-        return loss
-
-    def on_validation_epoch_start(self):
-        self.val_metric.reset()
+        self.train_metric.update(result)
 
     def on_validation_epoch_end(self):
-        self.epoch_time = time.time() - self.epoch_time
+        metric = {
+            **kltn_utils.add_prefix_in_dict(
+                self.train_metric.return_metrics(), "train"
+            ),
+            **kltn_utils.add_prefix_in_dict(self.val_metric.return_metrics(), "val"),
+            "epoch_time": time.time() - self.start_time,
+        }
 
-        self.log_result(self.train_metric.return_metrics(), "train")
-        self.log_result(self.val_metric.return_metrics(), "val")
-        self.log(
-            "epoch_time", self.epoch_time, on_step=False, on_epoch=True, sync_dist=True
-        )
+        self.log_result(metric)
 
     def validation_step(self, batch, batch_idx):
-        loss, loss_cls, label_logit, label = self.get_loss(batch)
+        result = self.get_loss(batch)
 
         # Update loss and metric
-        self.val_metric.update(
-            label_logit,
-            label,
-            loss,
-            loss_cls,
-        )
+        self.val_metric.update(result)
 
     def on_test_epoch_start(self):
-        self.test_metric.reset()
-        self.test_time = time.time()
+        self.test_metric.reset(kltn_utils.deepcopy_obj(const.LOSS_DICT))
+        self.start_time = time.time()
 
     def on_test_epoch_end(self):
-        self.test_time = time.time() - self.test_time
         test_result = {
-            f"test_{key}": value
-            for key, value in self.test_metric.return_metrics().items()
+            **kltn_utils.add_prefix_in_dict(self.test_metric.return_metrics(), "test"),
+            "test_time": time.time() - self.start_time,
         }
-        test_result["test_time"] = self.test_time
 
         kltn_utils.save_dict_to_json(test_result, f"{const.CP_PATH}/test_result.json")
 
     def test_step(self, batch, batch_idx):
-        loss, loss_cls, label_logit, label = self.get_loss(batch)
+        result = self.get_loss(batch)
 
         # Update loss and metric
-        self.test_metric.update(
-            label_logit,
-            label,
-            loss,
-            loss_cls,
-        )
+        self.test_metric.update(result)
 
-    def log_result(self, metric, mode):
+    def log_result(self, metric):
         for key, value in metric.items():
-            self.log(
-                f"{mode}_{key}", value, on_step=False, on_epoch=True, sync_dist=True
-            )
+            self.log(key, value, on_step=False, on_epoch=True, sync_dist=True)

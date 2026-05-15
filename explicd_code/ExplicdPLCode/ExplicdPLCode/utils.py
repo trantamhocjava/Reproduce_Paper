@@ -1,7 +1,7 @@
 from kltn_utils import kltn_utils
 from torch.utils.data import DataLoader
 
-from .dataset.dataset import CustomDataset, CustomDatasetForBlackbox
+from .run.train_explicd.dataset import CustomDatasetForBlackbox, ImageConceptDataset
 
 
 def print_shape_first_batch(loader):
@@ -16,11 +16,11 @@ def print_shape_first_batch(loader):
 def load_train_val_test(config, class2concept):
     train_transforms, val_transforms = kltn_utils.build_transform(config)
 
-    trainset = CustomDataset(
+    trainset = ImageConceptDataset(
         dataset_dir=f"{config.dataset_dir}/train",
         config=config,
         class2concept=class2concept,
-        transforms=train_transforms,
+        transform=train_transforms,
     )
 
     trainLoader = DataLoader(
@@ -31,11 +31,11 @@ def load_train_val_test(config, class2concept):
         drop_last=True,
     )
 
-    valset = CustomDataset(
+    valset = ImageConceptDataset(
         dataset_dir=f"{config.dataset_dir}/val",
         config=config,
         class2concept=class2concept,
-        transforms=val_transforms,
+        transform=val_transforms,
     )
 
     valLoader = DataLoader(
@@ -46,11 +46,11 @@ def load_train_val_test(config, class2concept):
         drop_last=False,
     )
 
-    testset = CustomDataset(
+    testset = ImageConceptDataset(
         dataset_dir=f"{config.dataset_dir}/test",
         config=config,
         class2concept=class2concept,
-        transforms=val_transforms,
+        transform=val_transforms,
     )
     testLoader = DataLoader(
         testset,

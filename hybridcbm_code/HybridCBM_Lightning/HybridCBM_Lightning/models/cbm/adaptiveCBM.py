@@ -1,11 +1,14 @@
 import torch
-from .linearCBM import LinearCBM
+
 from models.module.adaptive import AdaptiveModule
+
+from .linearCBM import LinearCBM
+
 
 class AdaptiveCBM(LinearCBM):
     def __init__(self, config, conceptbank):
         super().__init__(config, conceptbank)
-        
+
         clip_dim = self.conceptbank.clip_encoder.embedding_dim
 
         self.adaptive_module = AdaptiveModule(
@@ -18,12 +21,12 @@ class AdaptiveCBM(LinearCBM):
     def forward(self, img_feat, concept_features=None):
         if concept_features is None:
             concept_features = self.concept_features
-        
+
         adapted_img_feat = self.adaptive_module(img_feat)
         sim_score = self.scale * adapted_img_feat @ concept_features.T  # B, C
         logits = self.classifier(sim_score)
         return logits
-    
+
     def configure_optimizers(self):
         if self.is_train_concept:
             optimizer_dynamic = torch.optim.Adam(
@@ -34,7 +37,7 @@ class AdaptiveCBM(LinearCBM):
                     },
                 ]
             )
-            
+
             optimizer_classifier = torch.optim.Adam(
                 [
                     {"params": self.classifier.parameters(), "lr": self.config.lr},
@@ -43,10 +46,10 @@ class AdaptiveCBM(LinearCBM):
                 ]
             )
             return [optimizer_dynamic, optimizer_classifier], []
-            
+
         else:
             # Khi không train concept riêng, gộp chung tất cả vào 1 Optimizer
-            optimizer_classifier = torch.optim.Adam(    
+            optimizer_classifier = torch.optim.Adam(
                 [
                     {"params": self.classifier.parameters(), "lr": self.config.lr},
                     {
@@ -54,7 +57,6 @@ class AdaptiveCBM(LinearCBM):
                         "lr": self.config.lr,
                     },
                     {"params": self.scale, "lr": self.config.lr},
-                    
                     # 🚀 ĐĂNG KÝ ADAPTIVE MODULE VÀO ĐÂY
                     {"params": self.adaptive_module.parameters(), "lr": self.config.lr},
                 ]

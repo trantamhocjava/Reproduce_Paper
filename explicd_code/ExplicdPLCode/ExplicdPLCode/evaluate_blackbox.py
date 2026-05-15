@@ -6,7 +6,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.utilities import rank_zero_info
 
 from . import const, utils
-from .train import BlackBoxTrain
+from .run.train_explicd.train import BlackBoxTrain
 
 
 def main(config):
@@ -71,6 +71,6 @@ if __name__ == "__main__":
         "--dataset_dir", type="str", dest="dataset_dir", help="the path of the dataset"
     )
 
-    (cfg, args) = parser.parse_args()
+    cfg, args = parser.parse_args()
 
     main(cfg)

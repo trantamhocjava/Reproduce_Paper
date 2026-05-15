@@ -1,0 +1,7 @@
+{
+  "clip_model": "ViT-L-14",
+  "coco_dataset_dir": "null",
+  "concept_net_dataset_dir": null,
+  "batch_size": 128,
+  "context_length": 77
+}

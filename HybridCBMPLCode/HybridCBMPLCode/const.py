@@ -1,19 +1,22 @@
-from .gpt_concepts import concept_dataset
+from kltn_utils import kltn_utils
 
-CLASS2CONCEPT = {"isic2018": concept_dataset.isic2018_concept_dataset}
 CP_PATH = "/kaggle/working/checkpoint"
-CSV_LOGS = "csv_logs"
+INPUT_PATH = "/kaggle/input/datasets/tmtrnhelloworld/hybridcbmplcode"
 
-CLASS_NAMES = {
-    "IDRID": ["0", "1", "2", "3", "4"],
-    "BUSI": ["normal", "malignant", "benign"],
-    "isic2018": ["mel", "nv", "bcc", "akiec", "bkl", "df", "vasc"],
-    "nct_crc_he": ["ADI", "BACK", "DEB", "LYM", "MUC", "MUS", "NORM", "STR", "TUM"],
-    "lcc": [
-        "Colon adenocarcinoma",
-        "Colon benign tissue",
-        "Lung adenocarcinoma",
-        "Lung benign tissue",
-        "Lung squamous cell carcinoma",
-    ],
+TOKENIZER_NAME = "openai/clip-vit-base-patch32"
+
+
+LOSS_DICT = {
+    "loss": [],
+    "discri_loss": [],
+    "ort_loss": [],
+    "align_loss": [],
+    "class_loss": [],
+    "concept_loss": [],
+}
+
+CLASS_AND_CONCEPT = {
+    "isic2018": kltn_utils.read_json_to_dict(
+        f"{INPUT_PATH}/class_concept/isic2018/class_concept.json"
+    )
 }

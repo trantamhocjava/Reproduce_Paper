@@ -1,0 +1,21 @@
+{
+  "last_state": null,
+  "dataset_name": "your_dataset_name",
+  "dataset_dir": "/path/to/dataset",
+  "monitor": "val_y_bmac",
+  "start_epoch": 1,
+  "end_epoch": 1,
+  "batch_size": 128,
+  "transform": "uniform",
+  "optimizer": {
+    "optimizer": "adamw",
+    "lr": 0.0001,
+    "weight_decay": 0.01,
+    "betas": [0.9, 0.999]
+  },
+  "scheduler": null,
+  "amp": true,
+  "model": {
+    "clip_model": "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K"
+  }
+}

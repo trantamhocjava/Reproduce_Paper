@@ -6,7 +6,7 @@ from pytorch_lightning import Trainer
 from pytorch_lightning.utilities import rank_zero_info
 
 from . import const, utils
-from .train import ExplicdTrain
+from .run.train_explicd.train import ExplicdTrain
 
 
 def main(config):
@@ -72,6 +72,6 @@ if __name__ == "__main__":
         dest="clip_model",
     )
 
-    (cfg, args) = parser.parse_args()
+    cfg, args = parser.parse_args()
 
     main(cfg)

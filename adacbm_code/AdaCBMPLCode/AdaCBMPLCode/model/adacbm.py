@@ -21,7 +21,7 @@ class AdaptiveModule(nn.Module):
     def forward(self, org_img_feat):
         img_feat = self.linear1(org_img_feat)
         img_feat = img_feat + org_img_feat  # residual handling
-        img_feat = F.normalize(img_feat, dim=1)  # normalize
+        img_feat = F.normalize(img_feat, dim=-1)  # normalize
 
         return img_feat
 

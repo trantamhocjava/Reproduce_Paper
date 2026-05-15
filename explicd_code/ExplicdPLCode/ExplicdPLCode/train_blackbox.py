@@ -9,7 +9,7 @@ from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.utilities import rank_zero_info
 
 from . import const, utils
-from .train import BlackBoxTrain
+from .run.train_explicd.train import BlackBoxTrain
 
 
 def main(config):
@@ -146,6 +146,6 @@ if __name__ == "__main__":
         help="[LinearLR, ReduceLROnPlateau, StepLR]",
     )
 
-    (cfg, args) = parser.parse_args()
+    cfg, args = parser.parse_args()
 
     main(cfg)

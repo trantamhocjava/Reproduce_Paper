@@ -1,11 +1,12 @@
-import torch
 import random
-from tqdm import tqdm
+
 import numpy as np
-from apricot import CustomSelection, MixtureSelection, FacilityLocationSelection
+import torch
+from apricot import CustomSelection, FacilityLocationSelection, MixtureSelection
 from apricot.optimizers import OPTIMIZERS
-from scipy.sparse import csr_matrix
 from apricot.utils import _calculate_pairwise_distances
+from scipy.sparse import csr_matrix
+from tqdm import tqdm
 
 
 class ModifiedMixtureSelection(MixtureSelection):
@@ -16,25 +17,34 @@ class ModifiedMixtureSelection(MixtureSelection):
 
     def fit(self, X, y=None, sample_weight=None, sample_cost=None):
         self._X = X
-        X = _calculate_pairwise_distances(X, metric=self.metric, n_neighbors=self.n_neighbors)
+        X = _calculate_pairwise_distances(
+            X, metric=self.metric, n_neighbors=self.n_neighbors
+        )
 
         allowed_dtypes = list, np.ndarray, csr_matrix
 
         if not isinstance(X, allowed_dtypes):
-            raise ValueError("X must be either a list of lists, a 2D numpy array, or a scipy.sparse.csr_matrix.")
+            raise ValueError(
+                "X must be either a list of lists, a 2D numpy array, or a scipy.sparse.csr_matrix."
+            )
         if isinstance(X, np.ndarray) and len(X.shape) != 2:
             raise ValueError("X must have exactly two dimensions.")
         if self.n_samples > X.shape[0]:
-            raise ValueError("Cannot select more examples than the number in the data set.")
+            raise ValueError(
+                "Cannot select more examples than the number in the data set."
+            )
 
         if not self.sparse:
-            if X.dtype != 'float64':
-                X = X.astype('float64')
+            if X.dtype != "float64":
+                X = X.astype("float64")
 
         if isinstance(self.optimizer, str):
-            optimizer = OPTIMIZERS[self.optimizer](function=self,
-                                                   verbose=self.verbose, random_state=self.random_state,
-                                                   **self.optimizer_kwds)
+            optimizer = OPTIMIZERS[self.optimizer](
+                function=self,
+                verbose=self.verbose,
+                random_state=self.random_state,
+                **self.optimizer_kwds
+            )
         else:
             optimizer = self.optimizer
 
@@ -59,15 +69,19 @@ def clip_score(img_feat, concept_feat, n_shots, num_images_per_class):
     scores_mean = torch.empty((concept_feat.shape[0], num_cls))
     start_loc = 0
     for i in range(num_cls):
-        end_loc = sum(num_images_per_class[:i + 1])
-        scores_mean[:, i] = (concept_feat @ img_feat[start_loc:end_loc].t()).mean(dim=-1)
+        end_loc = sum(num_images_per_class[: i + 1])
+        scores_mean[:, i] = (concept_feat @ img_feat[start_loc:end_loc].t()).mean(
+            dim=-1
+        )
         start_loc = end_loc
     return scores_mean
 
 
 def mi_score(img_feat, concept_feat, num_images_per_class):
     num_cls = len(num_images_per_class)
-    scores_mean = clip_score(img_feat, concept_feat, None, num_images_per_class)  # Sim(c,y)
+    scores_mean = clip_score(
+        img_feat, concept_feat, None, num_images_per_class
+    )  # Sim(c,y)
     normalized_scores = scores_mean / (scores_mean.sum(dim=0) * num_cls)  # Sim_bar(c,y)
     # normalized_scores  = normalized_scores - normalized_scores.min() # normalize to positive
     margin_x = normalized_scores.sum(dim=1)  # sum_y in Y Sim_bar(c,y)
@@ -80,7 +94,14 @@ def mi_score(img_feat, concept_feat, num_images_per_class):
     return mi, scores_mean
 
 
-def submodular_select(img_feat, concept_feat, concept2cls, num_concepts, num_images_per_class, submodular_weights):
+def submodular_select(
+    img_feat,
+    concept_feat,
+    concept2cls,
+    num_concepts,
+    num_images_per_class,
+    submodular_weights,
+):
     assert num_concepts > 0
     num_cls = len(num_images_per_class)
 
@@ -92,7 +113,7 @@ def submodular_select(img_feat, concept_feat, concept2cls, num_concepts, num_ima
         return X[:, 0].sum()
 
     mi_selector = CustomSelection(num_concepts_per_cls, mi_based_function)
-    distance_selector = FacilityLocationSelection(num_concepts_per_cls, metric='cosine')
+    distance_selector = FacilityLocationSelection(num_concepts_per_cls, metric="cosine")
 
     mi_score_scale = submodular_weights[0]
     facility_weight = submodular_weights[-1]
@@ -117,9 +138,17 @@ def submodular_select(img_feat, concept_feat, concept2cls, num_concepts, num_ima
             mi_scores = all_mi_scores[cls_idx] * mi_score_scale
 
             current_concept_features = concept_feat[cls_idx]
-            augmented_concept_features = torch.hstack([torch.unsqueeze(mi_scores, 1), current_concept_features]).numpy()
-            selector = ModifiedMixtureSelection(num_concepts_per_cls, functions=[mi_selector, distance_selector],
-                                                weights=submodular_weights, optimizer='naive', verbose=False)
+            augmented_concept_features = torch.hstack(
+                [torch.unsqueeze(mi_scores, 1), current_concept_features]
+            ).numpy()
+
+            selector = ModifiedMixtureSelection(
+                num_concepts_per_cls,
+                functions=[mi_selector, distance_selector],
+                weights=submodular_weights,
+                optimizer="naive",
+                verbose=False,
+            )
 
             selected = selector.fit(augmented_concept_features).ranking
             selected_idx.extend(cls_idx[selected])
@@ -127,8 +156,9 @@ def submodular_select(img_feat, concept_feat, concept2cls, num_concepts, num_ima
     return torch.tensor(selected_idx)
 
 
-def random_select(_, __, concept2cls, num_concepts, num_images_per_class, submodular_weights):
-    assert num_concepts > 0
+def random_select(
+    _, __, concept2cls, num_concepts, num_images_per_class, submodular_weights
+):
     num_cls = len(num_images_per_class)
     take_all = False
     selected_idx = []

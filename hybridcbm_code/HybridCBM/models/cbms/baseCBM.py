@@ -28,6 +28,7 @@ class CBM(L.LightningModule):
         if "concept" in self.train_mode:
             if "stop" in self.train_mode:
                 self.concept_stop_epochs = int(self.train_mode.split("_")[-1])
+
             self.cls_start_epochs = int(self.train_mode.split("_")[-1])
 
         self.exp_root = Path(config.exp_root)
@@ -37,7 +38,7 @@ class CBM(L.LightningModule):
         )
         self.classifier = self.config_classifier()
         self.config_loss(config)
-        self.config_metrics()
+        self.config_metrics()   
         self.save_hyperparameters(ignore=["conceptbank"])
 
         self.automatic_optimization = False
@@ -134,6 +135,8 @@ class CBM(L.LightningModule):
             init_weight = torch.zeros(
                 (self.config.num_class, self.concept_features.shape[0])
             )
+
+
         if self.config.weight_init_method == "zero":
             init_weight.data.zero_()
         elif self.config.weight_init_method == "rand":
@@ -142,6 +145,8 @@ class CBM(L.LightningModule):
             init_weight = self.conceptbank.get_init_weight_from_cls(
                 self.config.weight_init_method
             )
+
+            
         return init_weight
 
     def configure_optimizers(self):
@@ -187,6 +192,7 @@ class CBM(L.LightningModule):
 
     def train_concept(self, image, label):
         final_loss = 0
+
         if self.config.lambda_discri > 0:
             image = image / image.norm(dim=-1, keepdim=True)
             discri_loss = self.discri_loss(
@@ -194,6 +200,7 @@ class CBM(L.LightningModule):
             )
             self.log("discri_loss", discri_loss)
             final_loss += discri_loss
+
         if self.config.lambda_ort > 0:
             ort_loss = self.ortho_loss(
                 self.conceptbank.dynamic_bank.concept_features,
@@ -213,11 +220,13 @@ class CBM(L.LightningModule):
             )
             self.log("align_loss", align_loss)
             final_loss += align_loss
+
         return final_loss
 
     def train_classifier(self, image, label):
         if self.config.use_normalize:
             image = image / image.norm(dim=-1, keepdim=True)
+
         logits = self.forward(image)
         # classification accuracy
         cls_loss = self.cls_loss(logits, label)
@@ -225,35 +234,42 @@ class CBM(L.LightningModule):
         final_loss = cls_loss
 
         if self.config.lambda_l1 > 0:
-            row_l1_norm = torch.linalg.vector_norm(
-                self.classifier.weight, ord=1, dim=-1
-            ).mean()
+                row_l1_norm = torch.linalg.vector_norm(
+                    self.classifier.weight, ord=1, dim=-1
+                ).mean()
             self.log("mean l1 norm", row_l1_norm)
             final_loss += self.config.lambda_l1 * row_l1_norm
 
         self.train_acc(logits, label)
         self.log("train_acc", self.train_acc, on_step=False, on_epoch=True)
+
         return final_loss
 
     def training_step(self, train_batch, batch_idx):
         image, label = train_batch
         # Training
         final_loss = 0
+
         if self.is_train_concept:
             final_loss += self.train_concept(image, label)
+
         if self.is_train_cls:
             final_loss += self.train_classifier(image, label)
+
         self.manual_backward(final_loss)
         # Update optimizer
         opts = self.optimizers()
+
         if isinstance(opts, torch.optim.Optimizer):
             opt_classifier = opts
         else:
             opt_dynamic, opt_classifier = opts
             opt_dynamic.step()
             opt_dynamic.zero_grad()
+
         opt_classifier.step()
         opt_classifier.zero_grad()
+
         self.log("final_loss", final_loss)
         return final_loss
 

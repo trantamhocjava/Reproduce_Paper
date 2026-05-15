@@ -1,39 +1,34 @@
+import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
 
 
 class ExplicdLoss(nn.Module):
-    def __init__(
-        self,
-    ):
-        super().__init__()
-
     def forward(
         self,
-        concepts_pred_logits,
-        concepts_true,
-        target_pred_logits,
-        target_true,
+        concept_logits_dict,
+        concept,
+        y_logits,
+        y,
     ):
-        loss_cls = F.cross_entropy(target_pred_logits, target_true)
+        cls_loss = F.cross_entropy(y_logits, y)
+        concept_loss = self.compute_concept_loss(concept_logits_dict, concept)
 
-        loss_concept = self.compute_concept_loss(concepts_pred_logits, concepts_true)
+        loss = cls_loss + concept_loss
 
-        loss = loss_cls + loss_concept
+        return loss, cls_loss, concept_loss
 
-        return loss, loss_cls, loss_concept
+    def compute_concept_loss(self, concept_logits_dict, concept):
+        concept_loss = []
 
-    def compute_concept_loss(self, concepts_pred_logits, concepts_true):
-        sum_loss_concept = 0
+        criteria = concept_logits_dict.keys()
 
-        concept_criterias = concepts_pred_logits.keys()
-
-        for idx, key in enumerate(concept_criterias):
-            loss_concept = F.cross_entropy(
-                concepts_pred_logits[key], concepts_true[:, idx]
+        for idx, criterion in enumerate(criteria):
+            loss_concept_item = F.cross_entropy(
+                concept_logits_dict[criterion], concept[:, idx]
             )
-            sum_loss_concept += loss_concept
+            concept_loss.append(loss_concept_item)
 
-        loss_concept = sum_loss_concept / len(concept_criterias)
+        concept_loss = np.array(concept_loss).mean()
 
-        return loss_concept
+        return concept_loss

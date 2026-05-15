@@ -1,8 +1,15 @@
+from kltn_utils import kltn_utils
+
 from . import concept_dataset
 
 CP_PATH = "/kaggle/working/checkpoint"
-CSV_LOGS = "csv_logs"
+INPUT_PATH = "/kaggle/input/datasets/tmtrnhelloworld/explicdplcode"
 
+CLASS_AND_CONCEPT = {
+    "isic2018": kltn_utils.read_json_to_dict(
+        f"{INPUT_PATH}/class_concept/isic2018/class_concept.json"
+    )
+}
 
 CONCEPT_DATASET_DICT = {
     "isic2018": concept_dataset.explicid_isic_dict,
@@ -24,16 +31,6 @@ CLASS_NAMES = {
         "Lung benign tissue",
         "Lung squamous cell carcinoma",
     ],
-}
-
-LOGIT_SCALE = {
-    "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224": 85.2323,
-    "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K": 99.998,
-}
-
-LATENT_DIM = {
-    "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224": (768, 512, 12),
-    "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K": (1024, 768, 16),
 }
 
 
