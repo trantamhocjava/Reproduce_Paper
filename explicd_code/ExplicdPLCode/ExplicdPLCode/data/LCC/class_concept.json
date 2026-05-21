@@ -1,0 +1,98 @@
+{
+  "concept_dict": {
+    "organ_context": [
+      "colonic mucosa with crypt-based architecture / gland-rich mucosa",
+      "lung parenchyma with alveoli/bronchiolar structures",
+      "organ context not clear / mixed field"
+    ],
+    "overall_architecture": [
+      "infiltrative irregular glands / back-to-back glands (invasion pattern)",
+      "gland-forming adenocarcinoma pattern in lung (acinar/papillary/lepidic-like)",
+      "solid nests/sheets of tumor cells (non-glandular dominant)",
+      "orderly benign architecture (preserved normal tissue pattern)"
+    ],
+    "cytologic_atypia": [
+      "minimal atypia (near-normal nuclei, uniform cells)",
+      "moderate atypia (noticeable pleomorphism, some hyperchromasia)",
+      "marked atypia (high pleomorphism, prominent nucleoli, hyperchromasia)"
+    ],
+    "mitotic_activity": [
+      "low/rare mitoses",
+      "intermediate mitoses",
+      "high/frequent mitoses"
+    ],
+    "necrosis": ["absent", "focal necrosis", "extensive necrosis"],
+    "mucin_features": [
+      "no evident mucin",
+      "intracellular or luminal mucin (e.g., goblet cells / luminal secretion)",
+      "abundant extracellular mucin pools"
+    ],
+    "squamous_differentiation": [
+      "absent (no keratinization / no intercellular bridges)",
+      "present (keratinization and/or intercellular bridges; possible keratin pearls)",
+      "benign squamous metaplasia / superficial squamous change (non-malignant)"
+    ]
+  },
+  "class_names": [
+    "Colon adenocarcinoma",
+    "Colon benign tissue",
+    "Lung adenocarcinoma",
+    "Lung benign tissue",
+    "Lung squamous cell carcinoma"
+  ],
+  "class2concept": [
+    [0, 0, 2, 2, 1, 1, 0],
+    [0, 3, 0, 0, 0, 1, 0],
+    [1, 1, 1, 1, 0, 1, 0],
+    [1, 3, 0, 0, 0, 0, 0],
+    [1, 2, 2, 2, 2, 0, 1]
+  ],
+  "concepts": [
+    "organ_context::colonic mucosa with crypt-based architecture / gland-rich mucosa",
+    "organ_context::lung parenchyma with alveoli/bronchiolar structures",
+    "organ_context::organ context not clear / mixed field",
+    "overall_architecture::infiltrative irregular glands / back-to-back glands (invasion pattern)",
+    "overall_architecture::gland-forming adenocarcinoma pattern in lung (acinar/papillary/lepidic-like)",
+    "overall_architecture::solid nests/sheets of tumor cells (non-glandular dominant)",
+    "overall_architecture::orderly benign architecture (preserved normal tissue pattern)",
+    "cytologic_atypia::minimal atypia (near-normal nuclei, uniform cells)",
+    "cytologic_atypia::moderate atypia (noticeable pleomorphism, some hyperchromasia)",
+    "cytologic_atypia::marked atypia (high pleomorphism, prominent nucleoli, hyperchromasia)",
+    "mitotic_activity::low/rare mitoses",
+    "mitotic_activity::intermediate mitoses",
+    "mitotic_activity::high/frequent mitoses",
+    "necrosis::absent",
+    "necrosis::focal necrosis",
+    "necrosis::extensive necrosis",
+    "mucin_features::no evident mucin",
+    "mucin_features::intracellular or luminal mucin (e.g., goblet cells / luminal secretion)",
+    "mucin_features::abundant extracellular mucin pools",
+    "squamous_differentiation::absent (no keratinization / no intercellular bridges)",
+    "squamous_differentiation::present (keratinization and/or intercellular bridges; possible keratin pearls)",
+    "squamous_differentiation::benign squamous metaplasia / superficial squamous change (non-malignant)"
+  ],
+  "concept2class": [
+    [0, 1],
+    [2, 3, 4],
+    [],
+    [0],
+    [2],
+    [4],
+    [1, 3],
+    [1, 3],
+    [2],
+    [0, 4],
+    [1, 3],
+    [2],
+    [0, 4],
+    [1, 2, 3],
+    [0],
+    [4],
+    [3, 4],
+    [0, 1, 2],
+    [],
+    [0, 1, 2, 3],
+    [4],
+    []
+  ]
+}

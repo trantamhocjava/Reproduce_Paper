@@ -1,12 +1,10 @@
-import time
-
 import numpy as np
-import pytorch_lightning as pl
 import torch
-from kltn_utils import kltn_utils
+import torch.nn as nn
+from kltn_utils import kltn_class, kltn_utils
 
 from ... import const
-from ...loss import ExplicdLoss
+from ...loss import ConceptLoss
 from .explicd import Explicd
 
 
@@ -17,26 +15,21 @@ class MetricCalculator:
         self.c_pred = []
         self.c_true = []
 
-        self.loss_dict = {
-            "loss": [],
-            "cls_loss": [],
-            "concept_loss": [],
-        }
+        self.loss_dict = kltn_utils.deepcopy_obj(obj=const.LOSS_DICT)
 
     def update(self, result):
-        y_pred = torch.argmax(result["y_logits"].detach().cpu(), dim=1)
-        self.y_pred.append(y_pred)
+        y_pred = torch.argmax(result["y_logits"].detach(), dim=1)
+        self.y_pred.append(y_pred.cpu())
         self.y_true.append(result["y"].cpu())
 
-        c_logits_dict = kltn_utils.detach_dict(result["c_logits_dict"])
         c_pred = []
-        for value in c_logits_dict.values():
-            criterion_pred = torch.argmax(value, dim=1)
-            c_pred.append(criterion_pred)
-        c_pred = torch.stack(c_pred, dim=1)
-        self.c_pred.append(c_pred)
+        for key, logits in result["c_logits_dict"].items():
+            c_pred_cri = torch.argmax(logits.detach(), dim=1).unsqueeze(1)
+            c_pred.append(c_pred_cri)
+        c_pred = torch.cat(c_pred, dim=1)
 
-        self.c_true.append(result["c"])
+        self.c_pred.append(c_pred.cpu())
+        self.c_true.append(result["c"].cpu())
 
         self.update_loss_dict(result)
 
@@ -61,9 +54,12 @@ class MetricCalculator:
             **self.return_loss_dict(),
         }
 
+    def get_loss_dict(self):
+        pass
+
     def update_loss_dict(self, result):
-        for key, value in result.items():
-            self.loss_dict[key].append(value.item())
+        for key, value in self.loss_dict.items():
+            value.append(result[key].item())
 
     def return_loss_dict(self):
         result = {}
@@ -74,21 +70,19 @@ class MetricCalculator:
         return result
 
 
-class ExplicdTrain(pl.LightningModule):
-    def __init__(self, config):
-        super().__init__()
-
+class ExplicdTrain(kltn_class.BaseTrain):
+    def __init__(self, CustomMetric, cp_path, config):
+        super().__init__(CustomMetric, cp_path)
         self.config = config
 
-        self.train_metric = MetricCalculator()
-        self.val_metric = MetricCalculator()
-        self.test_metric = MetricCalculator()
-
+        # Module
         self.model = Explicd(
             config=config,
         )
 
-        self.loss_fn = ExplicdLoss()
+        # Loss
+        self.cls_loss = nn.CrossEntropyLoss()
+        self.concept_loss = ConceptLoss()
 
         # auto off
         self.automatic_optimization = False
@@ -111,9 +105,16 @@ class ExplicdTrain(pl.LightningModule):
         cls_logits, concept_logits_dict = self.model(img)
 
         # Compute the loss
-        loss, cls_loss, concept_loss = self.loss_fn(
-            concept_logits_dict, concept, cls_logits, label
-        )
+        cls_loss = self.cls_loss(cls_logits, label)
+        concept_loss = self.concept_loss(concept_logits_dict, concept)
+
+        # TODO: DEBUG
+        kltn_utils.rank_zero_info_newline(f"cls_loss: {cls_loss.item()}")
+        kltn_utils.rank_zero_info_newline(f"concept_loss: {concept_loss.item()}")
+
+        # END DEBUG
+
+        loss = cls_loss + concept_loss
 
         return {
             "y_logits": cls_logits,
@@ -125,14 +126,7 @@ class ExplicdTrain(pl.LightningModule):
             "concept_loss": concept_loss,
         }
 
-    def on_train_epoch_start(self):
-        self.train_metric.reset()
-        self.val_metric.reset()
-        self.start_time = time.time()
-
-    def training_step(self, batch, batch_idx):
-        result = self.get_loss(batch)
-
+    def update_optimizer_manually(self, result):
         # Update optimizer
         self.manual_backward(result["loss"])
 
@@ -140,45 +134,3 @@ class ExplicdTrain(pl.LightningModule):
 
         kltn_utils.update_optimizer(optimizer_clip_model)
         kltn_utils.update_optimizer(optimizer_bridge)
-
-        # Update loss and metric
-        self.train_metric.update(result)
-
-    def on_validation_epoch_end(self):
-        metric = {
-            **kltn_utils.add_prefix_in_dict(
-                self.train_metric.return_metrics(), "train"
-            ),
-            **kltn_utils.add_prefix_in_dict(self.test_metric.return_metrics(), "val"),
-            "epoch_time": time.time() - self.start_time,
-        }
-
-        self.log_result(metric)
-
-    def validation_step(self, batch, batch_idx):
-        result = self.get_loss(batch)
-
-        # Update loss and metric
-        self.val_metric.update(result)
-
-    def on_test_epoch_start(self):
-        self.test_metric.reset()
-        self.start_time = time.time()
-
-    def on_test_epoch_end(self):
-        test_result = {
-            **kltn_utils.add_prefix_in_dict(self.test_metric.return_metrics(), "test"),
-            "test_time": time.time() - self.start_time,
-        }
-
-        kltn_utils.save_dict_to_json(test_result, f"{const.CP_PATH}/test_result.json")
-
-    def test_step(self, batch, batch_idx):
-        result = self.get_loss(batch)
-
-        # Update loss and metric
-        self.test_metric.update(result)
-
-    def log_result(self, metric):
-        for key, value in metric.items():
-            self.log(key, value, on_step=False, on_epoch=True, sync_dist=True)

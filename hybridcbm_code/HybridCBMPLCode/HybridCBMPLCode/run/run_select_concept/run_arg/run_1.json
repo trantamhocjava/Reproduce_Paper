@@ -1,0 +1,11 @@
+{
+  "cp_path": "/kaggle/working/checkpoint",
+  "clip_model": "ViT-L-14",
+  "transform": "uniform",
+  "dataset_dir": "/kaggle/input/datasets/tmtrnhelloworld/isic2018splittedv1",
+  "dataset_name": "isic2018",
+  "batch_size": 128,
+  "select_concept_method": "adacbm",
+  "num_select_concepts": 350,
+  "weight": 0.9
+}

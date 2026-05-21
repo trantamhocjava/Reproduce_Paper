@@ -1,9 +1,0 @@
-pytorch-lightning==2.4.0
-torchmetrics==1.4.2
-Pillow
-open-clip-torch
-ftfy
-regex
-transformers
-timm
-git+https://github.com/trantamhocjava/kltn_utils.git

@@ -20,6 +20,9 @@ class Explicd(nn.Module):
         self.clip_model, tokenizer = kltn_utils.build_clip_model(
             config.model.clip_model
         )
+        kltn_utils.rank_zero_info_newline(
+            f"Load clip_model {config.model.clip_model} ok"
+        )
 
         clip_model_config = kltn_const.CLIP_MODELS[config.model.clip_model]
         visual_feature_dim = clip_model_config["visual_feature_dim"]
@@ -43,12 +46,11 @@ class Explicd(nn.Module):
             out_features=config.num_class,
         )
 
-        # concept feat
+        # var
         self.concept_feat_dict = model_utils.get_concept_feat_dict(
             config.model.clip_model, config.concept_dict, config
         )
 
-        # logit scale
         self.register_buffer(
             "logit_scale",
             torch.tensor(
@@ -64,7 +66,7 @@ class Explicd(nn.Module):
         visual_feature_layer.register_forward_hook(self.hook_fn)
 
         # grad
-        model_utils.freeze_grad_for_clip_model(self.clip_model, config.model.clip_model)
+        model_utils.unfreeze_visual_encoder(self.clip_model, config.model.clip_model)
 
     def hook_fn(self, module, input, output):
         """

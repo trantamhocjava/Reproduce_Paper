@@ -12,29 +12,31 @@ class FFN(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x):
-        x = self.relu(self.linear1(x))
-        x = self.linear2(x)
+        x = self.linear2(self.relu(self.linear1(x)))
 
         return x
 
 
-def get_prefix(config, key):
+def get_final_concept(config, key, concept):
     if config.dataset_name == "isic2018":
-        prefix = f"the {key} of the lesion is "
+        concept = f"the {key} of the lesion is {concept}"
     elif config.dataset_name == "IDRID":
-        prefix = f"the {key} of the retina is "
+        concept = f"the {key} of the retina is {concept}"
     elif config.dataset_name == "BUSI":
-        prefix = f"the {key} of the breast is "
+        concept = f"the {key} of the breast is {concept}"
     elif config.dataset_name == "nct_crc_he":
-        prefix = f"the {key} of the tissue is "
+        concept = f"the {key} of the tissue is {concept}"
     elif config.dataset_name == "lcc":
-        prefix = f"the {key} of the tissue is "
+        concept = f"the {key} of the tissue is {concept}"
 
-    return prefix
+    return concept
 
 
 def get_visual_feature_layer(model, model_name):
-    if model_name == "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224":
+    if model_name in (
+        "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
+        "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224.orig_in21k",
+    ):
         visual_feature_layer = model.visual.trunk.blocks[-1]
     elif model_name == "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K":
         visual_feature_layer = model.visual.transformer.resblocks[-1]
@@ -42,8 +44,11 @@ def get_visual_feature_layer(model, model_name):
     return visual_feature_layer
 
 
-def freeze_grad_for_clip_model(model, model_name):
-    if model_name == "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224":
+def unfreeze_visual_encoder(model, model_name):
+    if model_name == (
+        "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224",
+        "hf-hub:microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224.orig_in21k",
+    ):
         kltn_utils.freeze_module(model.text)
 
     elif model_name == "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K":
@@ -57,11 +62,12 @@ def get_concept_feat_dict(clip_model_name, concept_dict, config):
 
     concept_feat_dict = {}
     for key in concept_dict.keys():
-        prefix = get_prefix(config, key)
-        prefix_concept_list = [prefix + concept for concept in concept_dict[key]]
+        concept_list = [
+            get_final_concept(config, key, concept) for concept in concept_dict[key]
+        ]
 
         concept_feat = kltn_utils.get_txt_feat(
-            prefix_concept_list,
+            concept_list,
             clip_model,
             clip_model_name,
             tokenizer,

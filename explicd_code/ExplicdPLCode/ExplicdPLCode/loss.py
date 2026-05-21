@@ -1,24 +1,14 @@
-import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-class ExplicdLoss(nn.Module):
+class ConceptLoss(nn.Module):
     def forward(
         self,
         concept_logits_dict,
         concept,
-        y_logits,
-        y,
     ):
-        cls_loss = F.cross_entropy(y_logits, y)
-        concept_loss = self.compute_concept_loss(concept_logits_dict, concept)
-
-        loss = cls_loss + concept_loss
-
-        return loss, cls_loss, concept_loss
-
-    def compute_concept_loss(self, concept_logits_dict, concept):
         concept_loss = []
 
         criteria = concept_logits_dict.keys()
@@ -29,6 +19,6 @@ class ExplicdLoss(nn.Module):
             )
             concept_loss.append(loss_concept_item)
 
-        concept_loss = np.array(concept_loss).mean()
+        concept_loss = torch.stack(concept_loss).mean()
 
         return concept_loss

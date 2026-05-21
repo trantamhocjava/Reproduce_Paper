@@ -1,19 +1,17 @@
+from kltn_utils import dataset
 from torch.utils.data import DataLoader
-
-from ... import const
-from .dataset import ImageConceptDataset
 
 
 def load_dataset(config, transform, mode):
-    dataset = ImageConceptDataset(
+    data_set = dataset.ImageConceptDataset(
         dataset_dir=f"{config.dataset_dir}/{mode}",
         transform=transform,
-        class2concept=config.class2concept,
-        config=config,
+        class_names=config.class_names,
+        concept2class=config.concept2class,
     )
 
     dataloader = DataLoader(
-        dataset=dataset,
+        dataset=data_set,
         batch_size=config.batch_size,
         shuffle=True if mode == "train" else False,
         num_workers=4,
@@ -21,12 +19,3 @@ def load_dataset(config, transform, mode):
     )
 
     return dataloader
-
-
-def update_config(config):
-    config.class_concept = const.CLASS_AND_CONCEPT[config.dataset_name]
-    config.class_names = config.class_concept["class_names"]
-    config.class2concept = config.class_concept["class2concept"]
-    config.concept_dict = config.class_concept["concept_dict"]
-
-    return config

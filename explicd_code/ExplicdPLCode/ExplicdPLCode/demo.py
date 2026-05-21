@@ -1,5 +1,2 @@
-[
-    "color::highly variable, often with multiple colors (black, brown, red, white, blue)",
-    "color::uniformly tan, brown, or black",
-    ....
-]
+/kaggle/input/datasets/tmtrnhelloworld/explicdplcode/run/train_explicd/run_arg/run_1_epoch.json
+run.train_explicd.train_explicd

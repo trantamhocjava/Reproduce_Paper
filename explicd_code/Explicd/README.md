@@ -15,9 +15,8 @@ Although explainability is essential in the clinical diagnosis, most deep learni
 - Introduces a visual concept learning module with a criteria anchor contrastive loss
 - Provides explainable diagnoses based on similarity scores between encoded visual concepts and textual criteria embeddings
 
-
-
 ## Usage
+
 Python version >= 3.9
 
 ```bash
@@ -29,10 +28,13 @@ pip install -r requirements.txt
 Download the dataset from ISIC2018 website and process with scripts under `dataset_utils` or use the our processed files from [Google Drive](https://drive.google.com/drive/folders/1vf6X44zALelFXQNCAmg0_VizT4yxRkse?usp=drive_link)
 
 To train blackbox baseline model like ResNet or ViT, use
+
 ```bash
 python train_blackbox.py --model resnet50.a1_in1k --data-path path_to_the_dataset --gpu 0
 ```
+
 To train Explicd, use
+
 ```bash
 python train_explicd.py --data-path path_to_the_dataset --gpu 0
 ```

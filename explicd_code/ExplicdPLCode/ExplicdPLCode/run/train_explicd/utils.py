@@ -1,3 +1,7 @@
+import os
+
+import torch
+from kltn_utils import kltn_utils
 from torch.utils.data import DataLoader
 
 from ... import const
@@ -23,12 +27,16 @@ def load_dataset(config, transform, mode):
     return dataloader
 
 
-def update_config(config):
-    config.class_concept = const.CLASS_AND_CONCEPT[config.dataset_name]
-    config.class_names = config.class_concept["class_names"]
-    config.num_class = len(config.class_names)
-    config.class2concept = config.class_concept["class2concept"]
-    config.concept_dict = config.class_concept["concept_dict"]
-    config.num_concept = 
+def setup_train(config):
+    os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
+    kltn_utils.seed_everything_in_pl()
+    os.makedirs(config.cp_path, exist_ok=True)
 
-    return config
+    config.class_concept = const.CLASS_AND_CONCEPT[config.dataset_name]
+    config.concept_dict = config.class_concept["concept_dict"]
+    config.class_names = config.class_concept["class_names"]
+    config.class2concept = torch.tensor(config.class_concept["class2concept"])
+    config.num_class = len(config.class_names)
+    config.concepts = config.class_concept["concepts"]
+    config.concept2class = config.class_concept["concept2class"]
+    config.num_concept = len(config.concepts)

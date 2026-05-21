@@ -19,3 +19,11 @@
     "clip_model": "hf-hub:laion/CLIP-ViT-L-14-laion2B-s32B-b82K"
   }
 }
+
+
+{
+  "optimizer": "adamw",
+  "lr": 0.0001,
+  "weight_decay": 0.01,
+}
+

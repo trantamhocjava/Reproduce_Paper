@@ -1,0 +1,134 @@
+{
+  "concept_dict": {
+    "microaneurysms": [
+      "absent",
+      "few isolated microaneurysms",
+      "multiple microaneurysms in several regions",
+      "numerous microaneurysms in all quadrants"
+    ],
+    "hemorrhages": [
+      "absent",
+      "few dot hemorrhages",
+      "multiple dot-blot hemorrhages",
+      "extensive hemorrhages in multiple quadrants",
+      "pre-retinal or vitreous hemorrhage"
+    ],
+    "exudates": [
+      "absent",
+      "few hard exudates",
+      "multiple hard exudates near vessels or macula",
+      "extensive hard exudates"
+    ],
+    "cotton_wool_spots": [
+      "absent",
+      "few localized cotton-wool spots",
+      "multiple cotton-wool spots indicating ischemia"
+    ],
+    "vascular_abnormalities": [
+      "normal retinal vessels",
+      "mild vessel dilation or tortuosity",
+      "venous beading in limited areas",
+      "venous beading in multiple quadrants",
+      "intraretinal microvascular abnormalities (IRMA)"
+    ],
+    "neovascularization": [
+      "absent",
+      "suspected abnormal fine vessels",
+      "neovascularization elsewhere (NVE)",
+      "neovascularization at the disc (NVD)"
+    ],
+    "distribution_of_lesions": [
+      "no lesions present",
+      "localized to one region",
+      "present in multiple regions",
+      "present in all four quadrants"
+    ],
+    "overall_severity_pattern": [
+      "normal retina",
+      "early diabetic changes",
+      "moderate non-proliferative diabetic retinopathy",
+      "severe non-proliferative diabetic retinopathy",
+      "proliferative diabetic retinopathy"
+    ]
+  },
+  "class_names": ["0", "1", "2", "3", "4"],
+  "class2concept": [
+    [0, 0, 0, 0, 0, 0, 0, 0],
+    [1, 1, 0, 0, 1, 0, 1, 1],
+    [2, 2, 2, 1, 1, 0, 2, 2],
+    [3, 3, 3, 2, 4, 0, 3, 3],
+    [3, 4, 2, 2, 4, 2, 3, 4]
+  ],
+  "concepts": [
+    "microaneurysms::absent",
+    "microaneurysms::few isolated microaneurysms",
+    "microaneurysms::multiple microaneurysms in several regions",
+    "microaneurysms::numerous microaneurysms in all quadrants",
+    "hemorrhages::absent",
+    "hemorrhages::few dot hemorrhages",
+    "hemorrhages::multiple dot-blot hemorrhages",
+    "hemorrhages::extensive hemorrhages in multiple quadrants",
+    "hemorrhages::pre-retinal or vitreous hemorrhage",
+    "exudates::absent",
+    "exudates::few hard exudates",
+    "exudates::multiple hard exudates near vessels or macula",
+    "exudates::extensive hard exudates",
+    "cotton_wool_spots::absent",
+    "cotton_wool_spots::few localized cotton-wool spots",
+    "cotton_wool_spots::multiple cotton-wool spots indicating ischemia",
+    "vascular_abnormalities::normal retinal vessels",
+    "vascular_abnormalities::mild vessel dilation or tortuosity",
+    "vascular_abnormalities::venous beading in limited areas",
+    "vascular_abnormalities::venous beading in multiple quadrants",
+    "vascular_abnormalities::intraretinal microvascular abnormalities (IRMA)",
+    "neovascularization::absent",
+    "neovascularization::suspected abnormal fine vessels",
+    "neovascularization::neovascularization elsewhere (NVE)",
+    "neovascularization::neovascularization at the disc (NVD)",
+    "distribution_of_lesions::no lesions present",
+    "distribution_of_lesions::localized to one region",
+    "distribution_of_lesions::present in multiple regions",
+    "distribution_of_lesions::present in all four quadrants",
+    "overall_severity_pattern::normal retina",
+    "overall_severity_pattern::early diabetic changes",
+    "overall_severity_pattern::moderate non-proliferative diabetic retinopathy",
+    "overall_severity_pattern::severe non-proliferative diabetic retinopathy",
+    "overall_severity_pattern::proliferative diabetic retinopathy"
+  ],
+  "concept2class": [
+    [0],
+    [1],
+    [2],
+    [3, 4],
+    [0],
+    [1],
+    [2],
+    [3],
+    [4],
+    [0, 1],
+    [],
+    [2, 4],
+    [3],
+    [0, 1],
+    [2],
+    [3, 4],
+    [0],
+    [1, 2],
+    [],
+    [],
+    [3, 4],
+    [0, 1, 2, 3],
+    [],
+    [4],
+    [],
+    [0],
+    [1],
+    [2],
+    [3, 4],
+    [0],
+    [1],
+    [2],
+    [3],
+    [4]
+  ]
+}

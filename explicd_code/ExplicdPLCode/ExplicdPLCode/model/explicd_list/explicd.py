@@ -3,18 +3,17 @@ from kltn_utils import kltn_const, kltn_utils
 from torch import nn
 from torch.nn import functional as F
 
-from . import utils as model_utils
+from ..explicd_dict import utils as explicd_dict_utils
+from . import utils as explicd_list_utils
 
 
-class Explicd(nn.Module):
+class ExplicdList(nn.Module):
     def __init__(
         self,
         config,
     ):
         super().__init__()
         self.config = config
-
-        self.criteria = list(config.concept_dict.keys())
 
         # module
         self.clip_model, tokenizer = kltn_utils.build_clip_model(
@@ -27,13 +26,13 @@ class Explicd(nn.Module):
         num_heads = clip_model_config["num_heads"]
 
         self.visual_tokens = nn.Parameter(
-            nn.init.xavier_uniform_(torch.zeros(len(self.criteria), visual_feature_dim))
+            nn.init.xavier_uniform_(torch.zeros(config.num_concept, visual_feature_dim))
         )
 
         self.cross_attn = nn.MultiheadAttention(
             embed_dim=visual_feature_dim, num_heads=num_heads, batch_first=True
         )
-        self.ffn = model_utils.FFN(visual_feature_dim, visual_feature_dim * 4)
+        self.ffn = explicd_dict_utils.FFN(visual_feature_dim, visual_feature_dim * 4)
         self.layer_norm = nn.LayerNorm(visual_feature_dim)
         self.proj = nn.Linear(
             in_features=visual_feature_dim, out_features=embedding_dim, bias=False
@@ -44,8 +43,11 @@ class Explicd(nn.Module):
         )
 
         # concept feat
-        self.concept_feat_dict = model_utils.get_concept_feat_dict(
-            config.model.clip_model, config.concept_dict, config
+        self.register_buffer(
+            "concept_feat",
+            explicd_list_utils.get_concept_feat(
+                config.model.clip_model, config.concepts, config
+            ),
         )
 
         # logit scale
@@ -58,13 +60,15 @@ class Explicd(nn.Module):
 
         # hook
         self.visual_features = None
-        visual_feature_layer = model_utils.get_visual_feature_layer(
+        visual_feature_layer = explicd_dict_utils.get_visual_feature_layer(
             self.clip_model, config.model.clip_model
         )
         visual_feature_layer.register_forward_hook(self.hook_fn)
 
         # grad
-        model_utils.freeze_grad_for_clip_model(self.clip_model, config.model.clip_model)
+        explicd_dict_utils.unfreeze_visual_encoder(
+            self.clip_model, config.model.clip_model
+        )
 
     def hook_fn(self, module, input, output):
         """
@@ -80,13 +84,7 @@ class Explicd(nn.Module):
 
         return params
 
-    def to_device(self, device):
-        self.concept_feat_dict = kltn_utils.dict2device(self.concept_feat_dict, device)
-
     def forward(self, imgs):
-        device = imgs.device
-        self.to_device(device)
-
         batch_size = imgs.shape[0]
 
         self.clip_model(imgs, None)
@@ -96,27 +94,12 @@ class Explicd(nn.Module):
         agg_visual_tokens, _ = self.cross_attn(
             visual_tokens, img_feat_map, img_feat_map
         )
+        agg_visual_tokens = agg_visual_tokens.mean(dim=1)
         agg_visual_tokens = F.normalize(
             self.proj(self.layer_norm(self.ffn(agg_visual_tokens))), dim=-1
         )
 
-        concept_logits_dict = {}
-        for idx, key in enumerate(self.criteria):
-            concept_logits_dict[key] = (
-                self.logit_scale
-                * (
-                    agg_visual_tokens[:, idx : idx + 1, :]
-                    @ self.concept_feat_dict[key]
-                    .repeat(batch_size, 1, 1)
-                    .permute(0, 2, 1)
-                )
-            ).squeeze(1)
-
-        concept_logits_list = []
-        for key in self.criteria:
-            concept_logits_list.append(concept_logits_dict[key])
-
-        concept_logits = torch.cat(concept_logits_list, dim=-1)
+        concept_logits = self.logit_scale * (agg_visual_tokens @ self.concept_feat.T)
         cls_logits = self.cls_head(concept_logits)
 
-        return cls_logits, concept_logits_dict
+        return cls_logits, concept_logits

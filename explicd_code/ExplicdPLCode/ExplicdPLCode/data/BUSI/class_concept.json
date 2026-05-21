@@ -1,0 +1,70 @@
+{
+  "concept_dict": {
+    "shape": ["round or oval", "irregular"],
+    "margin": [
+      "smooth, well-circumscribed",
+      "microlobulated",
+      "indistinct or spiculated"
+    ],
+    "orientation": [
+      "parallel to skin (wider than tall)",
+      "non-parallel (taller than wide)"
+    ],
+    "echo_pattern": [
+      "anechoic or hypoechoic homogeneous",
+      "heterogeneous hypoechoic",
+      "complex echogenicity"
+    ],
+    "posterior_acoustic_features": [
+      "no posterior feature",
+      "posterior enhancement",
+      "posterior shadowing"
+    ],
+    "boundary": ["well-defined boundary", "ill-defined boundary"],
+    "calcification": ["absent", "present"]
+  },
+  "class_names": ["normal", "malignant", "benign"],
+  "class2concept": [
+    [0, 0, 0, 0, 0, 0, 0],
+    [1, 2, 1, 2, 2, 1, 1],
+    [0, 0, 0, 1, 1, 0, 0]
+  ],
+  "concepts": [
+    "shape::round or oval",
+    "shape::irregular",
+    "margin::smooth, well-circumscribed",
+    "margin::microlobulated",
+    "margin::indistinct or spiculated",
+    "orientation::parallel to skin (wider than tall)",
+    "orientation::non-parallel (taller than wide)",
+    "echo_pattern::anechoic or hypoechoic homogeneous",
+    "echo_pattern::heterogeneous hypoechoic",
+    "echo_pattern::complex echogenicity",
+    "posterior_acoustic_features::no posterior feature",
+    "posterior_acoustic_features::posterior enhancement",
+    "posterior_acoustic_features::posterior shadowing",
+    "boundary::well-defined boundary",
+    "boundary::ill-defined boundary",
+    "calcification::absent",
+    "calcification::present"
+  ],
+  "concept2class": [
+    [0, 2],
+    [1],
+    [0, 2],
+    [],
+    [1],
+    [0, 2],
+    [1],
+    [0],
+    [2],
+    [1],
+    [0],
+    [2],
+    [1],
+    [0, 2],
+    [1],
+    [0, 2],
+    [1]
+  ]
+}
