@@ -1,1 +1,1 @@
-run / train_adacbm / run_arg / run_1_epoch.json
+adacbmplcode.run.train_adacbm.train_adacbm

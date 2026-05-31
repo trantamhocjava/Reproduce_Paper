@@ -33,6 +33,7 @@ def load_dataloader(
 def setup_train(config):
     os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
     kltn_utils.seed_everything_in_pl()
+
     os.makedirs(config.cp_path, exist_ok=True)
 
     config.class_concept = const.CLASS_AND_CONCEPT[config.dataset_name]

@@ -3,79 +3,68 @@ import torch.nn.functional as F
 from kltn_utils import kltn_const, kltn_utils
 from torch import nn
 
+from ..hybridcbm import hybridcbm
 
-class AdaHybridCBM(nn.Module):
-    def __init__(self, config, concept_feat, concept2class):
-        super().__init__()
-        self.config = config
 
-        # var
-        self.register_buffer(
-            "scale",
-            torch.tensor(
-                kltn_const.CLIP_MODELS[config.hybridcbm.clip_model]["logit_scale"]
-            ),
-        )
-        self.register_buffer("concept_feat", F.normalize(concept_feat, dim=-1))
+class AdaHybridCBM(hybridcbm.HybridCBM):
+    def __init__(self, config, select_concept_data):
+        super().__init__(config, select_concept_data)
 
-        # module
-        self.clip_model, tokenizer = kltn_utils.build_clip_model(
-            config.hybridcbm.clip_model
-        )
-
-        num_concept = concept_feat.shape[0]
-        concept2class = get_hybrid_concept2class(
-            concept2class=concept2class,
-            num_dynamic_concept=config.num_dynamic_concept,
-            num_class=config.num_class,
-        )
+        ## Get cls_head
         self.cls_head = get_cls_head(
-            cls_head_type=config.hybridcbm.cls_head_type,
-            num_concept=num_concept,
             num_class=config.num_class,
-            concept2class=concept2class,
+            num_dynamic_concept=config.model.num_dynamic_concept,
+            concept2class=select_concept_data["concept2class"],
         )
 
-        img_feat_dim = kltn_const.CLIP_MODELS[config.hybridcbm.clip_model][
-            "embedding_dim"
-        ]
+        clip_model_config = kltn_const.CLIP_MODELS[config.model.clip_model]
+        img_feat_dim = clip_model_config["embedding_dim"]
+
+        ## Get adaptive_module
         self.adaptive_module = AdaptiveModule(
-            dim=img_feat_dim, num_layers=config.hybridcbm.ada_num_layer
+            dim=img_feat_dim, num_layers=config.model.num_ada_layer
         )
-
-        # grad
-        kltn_utils.freeze_module(self.clip_model)
 
     def forward(self, img):
+        # Get concept feat
+        concept_feat = torch.cat(
+            [self.static_concept_feat, self.dynamic_concept_feat],
+            dim=0,
+        )
+        concept_feat = F.normalize(concept_feat, dim=1)
+
+        # Get img_feat
         self.clip_model.eval()
         img_feat = kltn_utils.get_img_feat_from_clip_model(
-            self.clip_model, self.config.hybridcbm.clip_model, img
+            self.clip_model, self.config.model.clip_model, img
         )
-        img_feat = F.normalize(self.adaptive_module(img_feat), dim=-1)
-        concept_logits = self.scale * (img_feat @ self.concept_feat.T)
-        label_logits = self.cls_head(concept_logits)
+        img_feat = self.adaptive_module(img_feat)
+        img_feat = F.normalize(img_feat, dim=-1)
 
-        return label_logits, img_feat, concept_logits
+        # Get hybrid_concept_logits
+        hybrid_concept_logits = self.scale * (img_feat @ concept_feat.T)
 
+        # Get label logits
+        label_logits = self.cls_head(hybrid_concept_logits)
 
-def get_cls_head(cls_head_type, num_concept, num_class, concept2class):
-    if cls_head_type == "linear":
-        result = nn.Linear(num_concept, num_class)
-    elif cls_head_type == "mask":
-        mask = kltn_utils.build_class_concept_matrix(
-            concept2class=concept2class,
-            num_class=num_class,
-        )
-        result = MaskClsHead(mask, num_class)
+        # Get concept_logits
+        concept_logits = hybrid_concept_logits[:, : self.num_static_concept]
 
-    return result
+        return label_logits, concept_logits, img_feat
 
 
-def get_hybrid_concept2class(concept2class, num_dynamic_concept, num_class):
+def get_cls_head(num_class, num_dynamic_concept, concept2class):
+    concept2class = [[item] for item in concept2class]
     class_indices = list(range(num_class))
-    result = concept2class + [class_indices] * num_dynamic_concept
+    hybrid_concept2class = concept2class + [class_indices] * num_dynamic_concept
 
-    return result
+    mask = kltn_utils.build_class_concept_matrix(
+        concept2class=hybrid_concept2class,
+        num_class=num_class,
+    )
+    cls_head = MaskClsHead(mask, num_class)
+
+    return cls_head
 
 
 class AdaptiveModule(nn.Module):
@@ -101,7 +90,7 @@ class AdaptiveModule(nn.Module):
 class MaskClsHead(nn.Module):
     def __init__(self, mask, num_class):
         super().__init__()
-        self.weight = nn.Parameter(mask.clone())
+        self.weight = nn.Parameter(mask.clone().to(dtype=torch.float32))
         self.bias = nn.Parameter(torch.zeros(num_class))
 
         self.register_buffer("mask", mask)

@@ -1,0 +1,27 @@
+train_config = {
+    "last_state": None,
+    "cp_path": "/kaggle/working/checkpoint",
+    "select_concept_data_path": "/kaggle/input/datasets/tmtrnhelloworld/klselectconceptadaalgo/select_concept_data.pth",
+    "dataset_name": "isic2018",
+    "dataset_dir": "/kaggle/input/datasets/tmtrnhelloworld/isic2018splittedv1",
+    "transform": "uniform",
+    "monitor": "val_y_bmac",
+    "start_epoch": 1,
+    "end_epoch": 1,
+    "batch_size": 128,
+    "optimizer": {"optimizer": "adamw", "lr": 0.0001},
+    "amp": True,
+    "loss": {
+        "lambda_discri": 1,
+        "lambda_ort": 0.1,
+        "lambda_align": 0.01,
+        "lambda_cls": 1,
+        "lambda_concept": 1,
+    },
+    "model": {
+        "clip_model": "ViT-L-14",
+        "scale": 0.1,
+        "num_dynamic_concept": 35,
+        "num_ada_layer": 2,
+    },
+}

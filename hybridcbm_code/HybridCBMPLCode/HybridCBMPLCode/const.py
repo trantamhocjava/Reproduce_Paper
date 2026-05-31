@@ -18,3 +18,16 @@ CLASS_AND_CONCEPT = {
         f"{INPUT_PATH}/data/isic2018/class_concept.json"
     )
 }
+
+
+CEL_WEIGHT = {
+    "isic2018": {
+        "akiec": 1.8548,
+        "bcc": 1.1802,
+        "bkl": 0.5519,
+        "df": 5.2746,
+        "nv": 0.0905,
+        "mel": 0.5449,
+        "vasc": 4.2694,
+    }
+}

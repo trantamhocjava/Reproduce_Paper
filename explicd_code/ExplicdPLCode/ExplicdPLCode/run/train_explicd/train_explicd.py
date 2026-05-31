@@ -1,37 +1,28 @@
 from optparse import OptionParser
 
-from kltn_utils import kltn_utils, train
+from kltn_utils import kltn_class, kltn_utils
 
 from ...model.explicd_dict.train import ExplicdTrain, MetricCalculator
 from . import utils as train_explicd_utils
 
 
-def main(config):
-    train_explicd_utils.setup_train(config)
+class ExplicdTrainer(kltn_class.BaseTrainer):
+    def __init__(self, config) -> None:
+        train_explicd_utils.setup_train(config)
+        super().__init__(config)
 
-    kltn_utils.rank_zero_info_newline("LOAD MODEL")
-    model = ExplicdTrain(
-        CustomMetric=MetricCalculator, cp_path=config.cp_path, config=config
-    )
+        self.model = ExplicdTrain(
+            CustomMetric=MetricCalculator, cp_path=config.cp_path, config=config
+        )
 
-    kltn_utils.rank_zero_info_newline("LOAD DATASET")
-    train_transform, val_transform = kltn_utils.build_transform(config.transform)
-    train_loader = train_explicd_utils.load_dataset(config, train_transform, "train")
-    val_loader = train_explicd_utils.load_dataset(config, val_transform, "val")
-
-    kltn_utils.rank_zero_info_newline("Train model")
-    train.train_model(
-        cp_path=config.cp_path,
-        last_state=config.last_state,
-        monitor=config.monitor,
-        end_epoch=config.end_epoch,
-        amp=config.amp,
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-    )
-
-    kltn_utils.rank_zero_info_newline("DONE")
+        train_transform, val_transform = kltn_utils.build_transform(config.transform)
+        self.train_loader = train_explicd_utils.load_dataset(
+            config, train_transform, "train"
+        )
+        self.val_loader = train_explicd_utils.load_dataset(config, val_transform, "val")
+        self.test_loader = train_explicd_utils.load_dataset(
+            config, val_transform, "test"
+        )
 
 
 if __name__ == "__main__":
@@ -43,7 +34,8 @@ if __name__ == "__main__":
         dest="arg_json",
     )
 
-    cfg, args = parser.parse_args()
-    cfg = kltn_utils.read_json_to_namespace(cfg.arg_json)
+    config, args = parser.parse_args()
+    config = kltn_utils.read_json_to_namespace(config.arg_json)
+    ExplicdTrainer(config).next()
 
-    main(cfg)
+    kltn_utils.rank_zero_info_newline("DONE")

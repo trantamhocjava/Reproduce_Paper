@@ -7,4 +7,5 @@ regex
 transformers
 timm
 apricot-select
+geomloss
 git+https://github.com/trantamhocjava/kltn_utils.git

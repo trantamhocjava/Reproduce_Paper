@@ -36,11 +36,5 @@ def setup_train(config):
     os.makedirs(config.cp_path, exist_ok=True)
 
     config.class_concept = const.CLASS_AND_CONCEPT[config.dataset_name]
-    config.concepts = config.class_concept["concepts"]
     config.class_names = config.class_concept["class_names"]
     config.num_class = len(config.class_names)
-    config.concept2class = config.class_concept["concept2class"]
-
-    config.num_images_per_class = kltn_utils.get_num_images_per_class(
-        dataset_dir=config.dataset_dir, class_names=config.class_names, mode="train"
-    )

@@ -1,2 +1,6 @@
-/kaggle/input/datasets/tmtrnhelloworld/explicdplcode/run/train_explicd/run_arg/run_1_epoch.json
+from explicdplcode.run.train_explicd import evaluate_explicd, train_explicd
+
+
+/kaggle/input/datasets/tmtrnhelloworld/explicdplcode
+
 run.train_explicd.train_explicd

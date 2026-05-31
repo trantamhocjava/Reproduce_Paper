@@ -5,34 +5,66 @@ from torch import nn
 
 
 class HybridCBM(nn.Module):
-    def __init__(self, config, concept_feat):
+    def __init__(self, config, select_concept_data):
         super().__init__()
         self.config = config
 
+        self.num_static_concept, embedding_dim = select_concept_data[
+            "concept_feat"
+        ].shape
+        self.num_concept = self.num_static_concept + config.model.num_dynamic_concept
+
+        ## Get clip_model
+        self.clip_model, tokenizer = kltn_utils.build_clip_model(
+            config.model.clip_model
+        )
+
+        ## Get cls_head
+        self.cls_head = torch.nn.Linear(self.num_concept, self.config.num_class)
+
+        ## Get dynamic_concept_feat
+        self.dynamic_concept_feat = nn.Parameter(
+            torch.randn(config.model.num_dynamic_concept, embedding_dim)
+        )
+
         # var
         self.register_buffer(
-            "scale", torch.tensor(config.hybridcbm.hybridcbm_scale, dtype=torch.float32)
+            "scale", torch.tensor(config.model.scale, dtype=torch.float32)
         )
-        self.register_buffer("concept_feat", F.normalize(concept_feat, dim=-1))
-
-        # module
-        num_concept = concept_feat.shape[0]
-        self.classifier = torch.nn.Linear(num_concept, self.config.num_class)
-        self.clip_model, tokenizer = kltn_utils.build_clip_model(
-            config.hybridcbm.clip_model
+        self.register_buffer(
+            "static_concept_feat",
+            select_concept_data["concept_feat"],
+        )
+        self.register_buffer(
+            "class_feat",
+            select_concept_data["class_feat"],
         )
 
-        # grad
+    def setup_grad(self):
         kltn_utils.freeze_module(self.clip_model)
 
     def forward(self, img):
+        # Get concept feat
+        concept_feat = torch.cat(
+            [self.static_concept_feat, self.dynamic_concept_feat],
+            dim=0,
+        )
+        concept_feat = F.normalize(concept_feat, dim=1)
+
+        # Get img_feat
         self.clip_model.eval()
         img_feat = kltn_utils.get_img_feat_from_clip_model(
-            self.clip_model, self.config.clip_model, img
+            self.clip_model, self.config.model.clip_model, img
         )
         img_feat = F.normalize(img_feat, dim=-1)
 
-        concept_logits = self.scale * (img_feat @ self.concept_feat.T)
-        label_logits = self.classifier(concept_logits)
+        # Get hybrid_concept_logits
+        hybrid_concept_logits = self.scale * (img_feat @ concept_feat.T)
 
-        return label_logits, img_feat, concept_logits
+        # Get label logits
+        label_logits = self.cls_head(hybrid_concept_logits)
+
+        # Get concept_logits
+        concept_logits = hybrid_concept_logits[:, : self.num_static_concept]
+
+        return label_logits, concept_logits, img_feat

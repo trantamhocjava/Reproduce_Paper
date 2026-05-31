@@ -1,50 +1,38 @@
 from optparse import OptionParser
 
 import torch
-from kltn_utils import kltn_utils, train
+from kltn_utils import kltn_class, kltn_utils
 
 from ...models.hybridcbm.train import HybridCBMTrain, MetricCalculator
 from . import utils as train_hybridcbm_utils
 
 
-def main(config):
-    train_hybridcbm_utils.setup_train(config)
+class HybridCBMTrainer(kltn_class.BaseTrainer):
+    def __init__(self, config) -> None:
+        train_hybridcbm_utils.setup_train(config)
+        super().__init__(config)
 
-    kltn_utils.rank_zero_info_newline("Load select concept data")
-    select_concept_data = torch.load(
-        config.select_concept_data_path, map_location="cpu", weights_only=False
-    )
+        self.select_concept_data = torch.load(
+            config.select_concept_data_path, map_location="cpu", weights_only=False
+        )
 
-    kltn_utils.rank_zero_info_newline("Load train, val dataset")
-    train_transform, val_transform = kltn_utils.build_transform(config.transform_method)
-    train_loader = train_hybridcbm_utils.load_dataloader(
-        config, train_transform, select_concept_data["concept2class"], "train"
-    )
-    val_loader = train_hybridcbm_utils.load_dataloader(
-        config, val_transform, select_concept_data["concept2class"], "val"
-    )
+        self.model = HybridCBMTrain(
+            CustomMetric=MetricCalculator,
+            cp_path=config.cp_path,
+            config=config,
+            select_concept_data=self.select_concept_data,
+        )
 
-    kltn_utils.rank_zero_info_newline("Load model")
-    model = HybridCBMTrain(
-        CustomMetric=MetricCalculator,
-        cp_path=config.cp_path,
-        config=config,
-        select_concept_data=select_concept_data,
-    )
-
-    kltn_utils.rank_zero_info_newline("Train model")
-    train.train_model(
-        cp_path=config.cp_path,
-        last_state=config.last_state,
-        monitor=config.monitor,
-        end_epoch=config.end_epoch,
-        amp=config.amp,
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-    )
-
-    kltn_utils.rank_zero_info_newline("Done")
+        train_transform, val_transform = kltn_utils.build_transform(config.transform)
+        self.train_loader = train_hybridcbm_utils.load_dataloader(
+            config, train_transform, self.select_concept_data["concept2class"], "train"
+        )
+        self.val_loader = train_hybridcbm_utils.load_dataloader(
+            config, val_transform, self.select_concept_data["concept2class"], "val"
+        )
+        self.test_loader = train_hybridcbm_utils.load_dataloader(
+            config, val_transform, self.select_concept_data["concept2class"], "test"
+        )
 
 
 if __name__ == "__main__":
@@ -56,7 +44,8 @@ if __name__ == "__main__":
         dest="arg_json",
     )
 
-    cfg, args = parser.parse_args()
-    cfg = kltn_utils.read_json_to_namespace(cfg.arg_json)
+    config, args = parser.parse_args()
+    config = kltn_utils.read_json_to_namespace(config.arg_json)
+    HybridCBMTrainer(config).next()
 
-    main(cfg)
+    kltn_utils.rank_zero_info_newline("DONE")
