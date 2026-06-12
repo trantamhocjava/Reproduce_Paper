@@ -2,8 +2,7 @@ import os
 
 import numpy as np
 from kltn_utils import kltn_utils
-
-from ... import const
+from kltn_utils.cbm import const as cbm_const
 
 
 class ConceptProcessor:
@@ -44,7 +43,7 @@ def setup_train(config):
     kltn_utils.seed_everything_in_pl()
     os.makedirs(config.cp_path, exist_ok=True)
 
-    config.class_concept = const.CLASS_AND_CONCEPT[config.dataset_name]
+    config.class_concept = cbm_const.CLASS_AND_CONCEPT[config.dataset_name]
 
     config.concepts = config.class_concept["concepts"]
 

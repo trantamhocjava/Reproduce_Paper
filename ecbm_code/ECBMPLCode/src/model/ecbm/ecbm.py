@@ -4,93 +4,110 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torchvision.models import ResNet101_Weights, resnet101
-from torchvision.transforms import v2
+
+
+class ECBM(nn.Module):
+    def __init__(self, config, num_concept):
+        super().__init__()
+        self.backbone, _ = get_backbone(config.model.backbone)
+
+        self.energy_model = EBM_GL(config, num_concept=num_concept)
+
+    def load_dict(self, model_state_dict):
+        filtered = {
+            k: v
+            for k, v in model_state_dict.items()
+            if "c_prob" not in k and "y_prob" not in k
+        }
+
+        self.load_state_dict(filtered, strict=False)
+
+    def setup_grad(self):
+        pass
+
+    def forward(self, x, concept, is_train, use_cy=True):
+        emb = self.backbone(x)
+        out = self.energy_model(emb, concept, is_train, use_cy)
+
+        return out
 
 
 class ResNetBottom(nn.Module):
     def __init__(self, original_model):
-        super(ResNetBottom, self).__init__()
-        self.features = nn.Sequential(*list(original_model.children())[:-1])
+        super().__init__()
+        self.layers = nn.Sequential(*list(original_model.children())[:-1])
 
     def forward(self, x):
-        x = self.features(x)
+        x = self.layers(x)
         x = torch.flatten(x, 1)
-        # print(x.shape)
         return x
 
 
 class ResNetTop(nn.Module):
     def __init__(self, original_model):
-        super(ResNetTop, self).__init__()
-        self.features = nn.Sequential(*[list(original_model.children())[-1]])
+        super().__init__()
+        self.layers = nn.Sequential(*[list(original_model.children())[-1]])
 
     def forward(self, x):
-        x = self.features(x)
+        x = self.layers(x)
         x = nn.Softmax(dim=-1)(x)
         return x
 
 
 def get_backbone(backbone_name):
-    if backbone_name == "resnet101_imagenet":
+    if backbone_name == "resnet101":
         weights = ResNet101_Weights.IMAGENET1K_V2
-        model = resnet101(weights=weights)
+        model = resnet101(weights=ResNet101_Weights.IMAGENET1K_V2)
         backbone = ResNetBottom(model)
         preprocess = weights.transforms()
 
     return backbone, preprocess
 
 
-def get_v2_list_from_v1_preprocess(preprocess):
-    resize = v2.Resize(
-        size=[preprocess.resize_size], interpolation=preprocess.interpolation
-    )
-    center_crop = v2.CenterCrop(size=(preprocess.crop_size, preprocess.crop_size))
-    normalize = v2.Normalize(mean=preprocess.mean, std=preprocess.std)
-
-    return [resize, center_crop, v2.ToDtype(torch.float32, scale=True), normalize]
-
-
 def generate_random_numbers(n, n_concept):
     numbers = set()
     while len(numbers) < float(n):
         numbers.add(random.randint(0, n_concept - 1))
+
     return list(numbers)
 
 
 class EBM_GL(nn.Module):
-    def __init__(self, config, cpt_size, input_size=1000, hid_size=1000):
-        super(EBM_GL, self).__init__()
+    def __init__(self, config, num_concept):
+        super().__init__()
+        self.cy_perturb_prob = config.model.cy_perturb_prob
+        self.cy_permute_prob = config.model.cy_permute_prob
+        self.hid_size = config.model.hid_size
+        self.input_size = config.model.emb_size
+        self.num_concept = num_concept
 
-        self.cy_concept_perturb_prob = config.cy_perturb_prob
-        self.cy_sample_perturb_prob = config.cy_permute_prob
-        self.num_classes = len(config.class_names)
-        self.hid_size = hid_size
-        self.input_size = input_size
-        # self.n_concepts=self.n_concepts
-        self.n_concepts = cpt_size
         # project labels y into the embedding to calculate class-wise energy
         self.y_prob = nn.Parameter(
             torch.randn((config.batch_size, len(config.class_names), 1))
         )
-        self.y_embedding = nn.Parameter(torch.randn((self.num_classes, hid_size)))
+        self.y_embedding = nn.Parameter(torch.randn((config.num_class, self.hid_size)))
 
-        self.c_prob = nn.Parameter(torch.randn((config.batch_size, self.n_concepts, 2)))
-        self.c_embedding = nn.Parameter(torch.randn((self.n_concepts * 2, hid_size)))
+        self.c_prob = nn.Parameter(
+            torch.randn((config.batch_size, self.num_concept, 2))
+        )
+        self.c_embedding = nn.Parameter(
+            torch.randn((self.num_concept * 2, self.hid_size))
+        )
 
         self.classifier_xc = torch.nn.ModuleList()
-        for i in range(self.n_concepts):
-            self.classifier_xc.append(torch.nn.Linear(hid_size, 1))
+        for i in range(self.num_concept):
+            self.classifier_xc.append(torch.nn.Linear(self.hid_size, 1))
 
-        self.concept_proj = nn.Linear(self.n_concepts * self.hid_size, self.hid_size)
+        self.concept_proj = nn.Linear(self.num_concept * self.hid_size, self.hid_size)
         self.fc_c = nn.Linear(self.hid_size, self.hid_size)
 
         # proj embedding to energy.
-        self.xy_fc1 = nn.Linear(input_size, hid_size)
+        self.xy_fc1 = nn.Linear(self.input_size, self.hid_size)
 
-        self.xc_fc1 = nn.Linear(input_size, hid_size)
+        self.xc_fc1 = nn.Linear(self.input_size, self.hid_size)
 
-        self.classifier_xy = nn.Linear(hid_size, 1)
-        self.classifier_cy = nn.Linear(hid_size, 1)
+        self.classifier_xy = nn.Linear(self.hid_size, 1)
+        self.classifier_cy = nn.Linear(self.hid_size, 1)
 
         self.smx = torch.nn.Softmax(dim=-2)
         self.smx_c = torch.nn.Softmax(dim=-1)
@@ -119,6 +136,7 @@ class EBM_GL(nn.Module):
         permute_samps = torch.tensor(
             generate_random_numbers(permute_sample_number, bs)
         ).cuda()
+
         c_gt = c_gt.long()
         to_be_interf = c_gt[permute_samps]
         to_be_interf[:, permute_concept_idx] = to_be_interf[:, permute_concept_idx] ^ 1
@@ -170,8 +188,8 @@ class EBM_GL(nn.Module):
             c_prob = self.c_prob
             c_prob = self.smx_c(c_prob)
             c_embed = (
-                c_embed[:, : self.n_concepts] * c_prob[:, :, 0:1]
-                + c_embed[:, self.n_concepts :] * c_prob[:, :, 1:2]
+                c_embed[:, : self.num_concept] * c_prob[:, :, 0:1]
+                + c_embed[:, self.num_concept :] * c_prob[:, :, 1:2]
             )
             # print(c_embed.shape)
         c_embed = F.normalize(c_embed, p=2, dim=-1)
@@ -180,7 +198,7 @@ class EBM_GL(nn.Module):
         )  # [bs,concept_size*2, hidden_size]
 
         xc_energy = []
-        for i in range(self.n_concepts):
+        for i in range(self.num_concept):
             if not is_training:
                 # print(c_embed[:,i].shape)
                 xc_embed = x_embed[:, i] * c_embed[:, i]
@@ -199,9 +217,9 @@ class EBM_GL(nn.Module):
                 xc_pos_embed = F.relu(xc_pos_embed)
 
                 xc_neg_embed = (
-                    x_embed[:, i + self.n_concepts] * c_embed[:, i + self.n_concepts]
+                    x_embed[:, i + self.num_concept] * c_embed[:, i + self.num_concept]
                 )
-                xc_neg_embed = x_embed[:, i + self.n_concepts] + xc_neg_embed
+                xc_neg_embed = x_embed[:, i + self.num_concept] + xc_neg_embed
                 xc_neg_embed = F.relu(xc_neg_embed)
                 xc_embed = torch.stack(
                     [xc_pos_embed, xc_neg_embed], dim=1
@@ -211,6 +229,7 @@ class EBM_GL(nn.Module):
                 xc_energy_single = xc_energy_single.view(bs, -1)
                 xc_energy_single = xc_energy_single.unsqueeze(1)
             xc_energy.append(xc_energy_single)
+
         xc_energy = torch.cat(xc_energy, dim=1)
 
         #### c->y energy.####
@@ -221,7 +240,7 @@ class EBM_GL(nn.Module):
                     single_c_embed = torch.where(
                         c_prob[:, k, 1:2] > 0.5,
                         c_embed_cy[:, k, :],
-                        c_embed_cy[:, k + self.n_concepts, :],
+                        c_embed_cy[:, k + self.num_concept, :],
                     )
                     single_c_embed = single_c_embed.unsqueeze(1)
                     c_embed.append(single_c_embed)
@@ -242,14 +261,14 @@ class EBM_GL(nn.Module):
                 c_embed = []
                 c_pos = self.cy_augment(
                     c_gt=c_pos,
-                    permute_ratio=self.cy_concept_perturb_prob,
-                    permute_prob=self.cy_sample_perturb_prob,
+                    permute_ratio=self.cy_perturb_prob,
+                    permute_prob=self.cy_permute_prob,
                 )
                 for k in range(c_pos.shape[1]):
                     single_c_embed = torch.where(
                         c_pos[:, k] == 1,
                         c_embed_cy[:, k, :],
-                        c_embed_cy[:, k + self.n_concepts, :],
+                        c_embed_cy[:, k + self.num_concept, :],
                     )
                     # print(single_c_embed.shape)
                     single_c_embed = single_c_embed.unsqueeze(1)
@@ -277,39 +296,3 @@ class EBM_GL(nn.Module):
             return xy_energy, cy_energy, xc_energy, y_prob, c_prob
         else:
             return xy_energy, cy_energy, xc_energy
-
-
-class ECBM(nn.Module):
-    def __init__(
-        self,
-        config,
-    ):
-        super().__init__()
-        self.backbone, preprocess = get_backbone(config.backbone)
-        self.preprocess_list = get_v2_list_from_v1_preprocess(preprocess)
-
-        self.d_embedding = config.emb_size
-        self.n_classes = len(config.class_names)
-        self.energy_model = EBM_GL(
-            config,
-            input_size=config.emb_size,
-            hid_size=config.hid_size,
-            cpt_size=config.cpt_size,
-        )
-        if config.freezebb:
-            for param in self.backbone.parameters():
-                param.requires_grad = False
-
-    def load_dict(self, model_state_dict):
-        filtered = {
-            k: v
-            for k, v in model_state_dict.items()
-            if "c_prob" not in k and "y_prob" not in k
-        }
-
-        self.load_state_dict(filtered, strict=False)
-
-    def forward(self, x, concept, is_train, use_cy=True):
-        emb = self.backbone(x)
-        out = self.energy_model(emb, concept, is_train, use_cy)
-        return out

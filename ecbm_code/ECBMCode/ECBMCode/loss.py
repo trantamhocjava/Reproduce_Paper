@@ -10,7 +10,6 @@ class EBMLoss_label(nn.Module):
         self.class_list = class_list
 
     def forward(self, energy, gt):
-
         batch_size = energy.size(0)
         y_tem = (
             torch.tensor([self.class_list.index(tem) for tem in gt]).long().to(DEVICE)

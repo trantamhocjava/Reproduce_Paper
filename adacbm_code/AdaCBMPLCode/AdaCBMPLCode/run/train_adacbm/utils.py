@@ -1,9 +1,8 @@
 import os
 
 from kltn_utils import dataset, kltn_utils
+from kltn_utils.cbm import const as cbm_const
 from torch.utils.data import DataLoader
-
-from ... import const
 
 
 def load_dataloader(
@@ -36,6 +35,6 @@ def setup_train(config):
 
     os.makedirs(config.cp_path, exist_ok=True)
 
-    config.class_concept = const.CLASS_AND_CONCEPT[config.dataset_name]
+    config.class_concept = cbm_const.CLASS_AND_CONCEPT[config.dataset_name]
     config.class_names = config.class_concept["class_names"]
     config.num_class = len(config.class_names)

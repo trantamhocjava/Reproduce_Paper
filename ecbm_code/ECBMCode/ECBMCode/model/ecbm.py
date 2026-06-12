@@ -210,6 +210,7 @@ class EBM_GL(nn.Module):
                 xc_energy_single = xc_energy_single.view(bs, -1)
                 xc_energy_single = xc_energy_single.unsqueeze(1)
             xc_energy.append(xc_energy_single)
+
         xc_energy = torch.cat(xc_energy, dim=1)
 
         #### c->y energy.####

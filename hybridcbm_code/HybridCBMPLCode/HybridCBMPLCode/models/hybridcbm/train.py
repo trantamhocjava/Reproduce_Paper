@@ -32,7 +32,7 @@ class HybridCBMTrain(kltn_class.BaseTrain):
         self.cls_loss = torch.nn.CrossEntropyLoss()
         self.concept_loss = nn.BCEWithLogitsLoss(reduction="mean")
 
-        # Grad
+    def setup_grad(self):
         self.model.setup_grad()
 
     # define optimizers and schedulers

@@ -25,6 +25,9 @@ class AdaHybridCBM(hybridcbm.HybridCBM):
             dim=img_feat_dim, num_layers=config.model.num_ada_layer
         )
 
+    def setup_grad(self):
+        kltn_utils.freeze_module(self.clip_model)
+
     def forward(self, img):
         # Get concept feat
         concept_feat = torch.cat(

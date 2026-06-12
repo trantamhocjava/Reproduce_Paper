@@ -1,5 +1,3 @@
-from kltn_utils import kltn_utils
-
 INPUT_PATH = "/kaggle/input/datasets/tmtrnhelloworld/hybridcbmplcode"
 
 TOKENIZER_NAME = "openai/clip-vit-base-patch32"
@@ -13,12 +11,6 @@ LOSS_DICT = {
     "concept_loss": [],
 }
 
-CLASS_AND_CONCEPT = {
-    "isic2018": kltn_utils.read_json_to_dict(
-        f"{INPUT_PATH}/data/isic2018/class_concept.json"
-    )
-}
-
 
 CEL_WEIGHT = {
     "isic2018": {
@@ -29,5 +21,29 @@ CEL_WEIGHT = {
         "nv": 0.0905,
         "mel": 0.5449,
         "vasc": 4.2694,
-    }
+    },
+    "nct": {
+        "ADI": 0.960000,
+        "BACK": 0.946372,
+        "DEB": 0.868307,
+        "LYM": 0.864555,
+        "MUC": 1.125704,
+        "MUS": 0.738916,
+        "NORM": 1.140685,
+        "STR": 0.958466,
+        "TUM": 0.698488,
+    },
+    "lcc": None,
+    "idrid": {
+        "0": 0.706797,
+        "1": 4.044444,
+        "2": 0.582400,
+        "3": 1.086568,
+        "4": 1.427451,
+    },
+    "busi": {
+        "benign": 0.594285,
+        "malignant": 1.238095,
+        "normal": 1.961006,
+    },
 }

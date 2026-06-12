@@ -18,6 +18,7 @@ class AdaHybridCBMTrain(hybridcbm_train.HybridCBMTrain):
         weight = get_CEL_weight(config.dataset_name, config.class_names)
         self.cls_loss = torch.nn.CrossEntropyLoss(weight=weight)
 
+    def setup_grad(self):
         # Grad
         self.model.setup_grad()
 
@@ -72,6 +73,10 @@ class AdaHybridCBMTrain(hybridcbm_train.HybridCBMTrain):
 
 def get_CEL_weight(dataset_name, class_names):
     weight_dict = const.CEL_WEIGHT[dataset_name]
+
+    if weight_dict is None:
+        return None
+
     weight = []
     for class_name in class_names:
         weight.append(weight_dict[class_name])

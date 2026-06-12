@@ -18,6 +18,7 @@ class ExplicdHybridCBMTrain(adacbm_hybridcbm_train.AdaHybridCBMTrain):
             config.model.clip_model
         )
 
+    def setup_grad(self):
         # grad
         self.model.setup_grad()
         kltn_utils.freeze_module(self.clip_model)

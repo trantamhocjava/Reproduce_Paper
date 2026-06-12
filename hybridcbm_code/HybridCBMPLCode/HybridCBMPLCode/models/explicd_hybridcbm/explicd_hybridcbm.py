@@ -68,10 +68,6 @@ class ExplicdHybridCBM(adacbm_hybridcbm.AdaHybridCBM):
         img_feat_map = self.visual_features[:, 1:, :]
         img_feat_map = self.adaptive_module(img_feat_map)
 
-        # TODO: DEBUG
-        kltn_utils.rank_zero_info_newline(f"img_feat_map.shape: {img_feat_map.shape}")
-        # END DEBUG
-
         visual_tokens = self.visual_tokens.repeat(batch_size, 1, 1)
         agg_visual_tokens, _ = self.cross_attn(
             visual_tokens, img_feat_map, img_feat_map

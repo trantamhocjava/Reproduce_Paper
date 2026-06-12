@@ -61,6 +61,7 @@ class AdaCBM(nn.Module):
         )
         self.register_buffer("mask", mask)
 
+    def setup_grad(self):
         # Grad
         kltn_utils.freeze_module(self.clip_model)
 

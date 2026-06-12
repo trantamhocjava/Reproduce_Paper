@@ -25,6 +25,9 @@ class AdacbmTrain(kltn_class.BaseTrain):
         self.cls_loss = nn.CrossEntropyLoss()
         self.concept_loss = nn.BCEWithLogitsLoss()
 
+    def setup_grad(self):
+        self.model.setup_grad()
+
     # define optimizers and schedulers
     def configure_optimizers(self):
         optimizer = kltn_utils.build_optimizer(
