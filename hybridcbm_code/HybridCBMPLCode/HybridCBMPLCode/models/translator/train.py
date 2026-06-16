@@ -20,7 +20,7 @@ class MetricCalculator:
     def update(self, result):
         pred_tokens = torch.argmax(result["token_logits"].detach(), dim=1)
         self.pred_tokens.append(pred_tokens.cpu())
-        self.tokens.append(result["tokens"].cpu())
+        self.tokens.append(result["token"].cpu())
 
         self.loss_token.append(result["loss_token"].item())
         self.loss.append(result["loss"].item())
@@ -85,17 +85,17 @@ class ConceptTranslatorTrain(pl.LightningModule):
         return res
 
     def get_loss(self, batch):
-        feature, tokens = batch
+        embedding, token = batch
 
-        token_logits, _ = self.translator(feature, tokens)
-        tokens = tokens.flatten()
-        loss_token = self.loss_ce(token_logits, tokens)
+        token_logits, _ = self.translator(embedding, token)
+        token = token.flatten()
+        loss_token = self.loss_ce(token_logits, token)
 
         loss = loss_token
 
         return {
             "token_logits": token_logits,
-            "tokens": tokens,
+            "token": token,
             "loss_token": loss_token,
             "loss": loss,
         }

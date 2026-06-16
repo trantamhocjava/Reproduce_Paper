@@ -6,60 +6,30 @@ import torch.nn.functional as F
 
 
 class CBLoss(nn.Module):
-
     def __init__(
         self,
         config,
     ):
-        """
-        Initialize the CBLoss.
-
-        Args:
-            num_classes (int, optional): Number of target classes.
-            reduction (str, optional): Reduction method for the loss.
-            alpha (float, optional): Weight in joint training.
-            config (dict, optional): Configuration dictionary.
-        """
-        super(CBLoss, self).__init__()
-        self.num_classes = len(config.class_names)
-        self.alpha = config.alpha
+        super().__init__()
+        self.config = config
 
     def forward(
         self,
-        concepts_pred_logits,
-        concepts_true,
-        target_pred_logits,
-        target_true,
+        concept_logits,
+        concept,
+        label_logits,
+        label,
     ):
-        """
-        Compute the loss.
+        concept_loss = self.compute_concept_loss(concept, concept_logits)
 
-        Args:
-            concepts_pred_probs (Tensor): Predicted concept probabilities.
-            concepts_true (Tensor): Ground-truth concept values.
-            target_pred_logits (Tensor): Predicted target logits.
-            target_true (Tensor): Ground-truth target values.
+        target_loss = F.cross_entropy(label_logits, label.long())
 
-        Returns:
-            Tensor: Target loss, concept loss, and total loss.
-        """
-        concepts_loss = self.compute_concept_loss(concepts_true, concepts_pred_logits)
+        return target_loss, concept_loss
 
-        if self.num_classes == 2:
-            # Logits to probs
-            target_pred_probs = nn.Sigmoid()(target_pred_logits.squeeze(1))
-            target_loss = F.binary_cross_entropy(target_pred_probs, target_true.float())
-        else:
-            target_loss = F.cross_entropy(target_pred_logits, target_true.long())
-
-        total_loss = target_loss + self.alpha * concepts_loss
-
-        return target_loss, concepts_loss, total_loss
-
-    def compute_concept_loss(self, concepts_true, concepts_pred_logits):
-        concepts_true = concepts_true.float()  # [B, C]
+    def compute_concept_loss(self, concept_true, concept_logits):
+        concept_true = concept_true.float()  # [B, C]
         concepts_loss = F.binary_cross_entropy_with_logits(
-            concepts_pred_logits, concepts_true, reduction="none"
+            concept_logits, concept_true, reduction="none"
         )  #  [B, C]
 
         concepts_loss = concepts_loss.mean(dim=0).sum()
@@ -68,65 +38,25 @@ class CBLoss(nn.Module):
 
 
 class SCBLoss(nn.Module):
-    """
-    Loss function for the Stochastic Concept Bottleneck Model (SCBM).
-    """
-
     def __init__(self, config):
-        """
-        Initialize the SCBLoss.
-
-        Args:
-            num_classes (int, optional): Number of target classes.
-            alpha (float, optional): Weight for joint training.
-            config (dict, optional): Configuration dictionary.
-        """
-        super(SCBLoss, self).__init__()
-        self.num_classes = len(config.class_names)
-        self.reg_precision = config.reg_precision
-        self.reg_weight = config.reg_weight
-
-        self.log_num_mc = math.log(config.num_monte_carlo)
-        self.alpha = config.alpha
+        super().__init__()
+        self.config = config
 
     def forward(
         self,
-        concepts_mcmc_logit,
-        concepts_true,
-        target_pred_logits,
-        target_true,
+        concept_mcmc_logit,
+        concept_true,
+        label_logits,
+        label,
         c_triang_cov,
         cov_not_triang=False,
     ):
-        """
-        Compute the loss.
+        concept_loss = self.compute_concept_loss(concept_mcmc_logit, concept_true)
 
-        Args:
-            concepts_mcmc_probs (Tensor): MCMC matrix of predicted concept probabilities.
-            concepts_true (Tensor): Ground-truth concept values.
-            target_pred_logits (Tensor): Predicted target logits.
-            target_true (Tensor): Ground-truth target values.
-            c_triang_cov (Tensor): Cholesky decomposition of the concept covariance matrix.
-            cov_not_triang (bool, optional): Flag indicating if the covariance is in its cholesky form or already the covariance.
+        class_loss = F.cross_entropy(label_logits, label)
 
-        Returns:
-            Tensor: Target loss, concept loss, precision loss, and total loss.
-        """
-        concepts_loss = self.compute_concept_loss(concepts_mcmc_logit, concepts_true)
-
-        if self.num_classes == 2:
-            # Logits to probs
-            target_pred_probs = nn.Sigmoid()(target_pred_logits.squeeze(1))
-            target_loss = F.binary_cross_entropy(
-                target_pred_probs, target_true.float(), reduction="mean"
-            )
-        else:
-            target_loss = F.cross_entropy(
-                target_pred_logits, target_true.long(), reduction="mean"
-            )
-
-        # Add precision loss
-        if self.reg_precision == "l1":
+        # Get precision loss
+        if self.config.loss.reg_precision == "l1":
             if cov_not_triang:
                 prec_matrix = torch.inverse(c_triang_cov.float())
             else:
@@ -134,30 +64,29 @@ class SCBLoss(nn.Module):
                 prec_matrix = torch.matmul(
                     torch.transpose(c_triang_inv, dim0=1, dim1=2), c_triang_inv
                 )
+
             prec_loss = prec_matrix.abs().sum(dim=(1, 2)) - prec_matrix.diagonal(
                 offset=0, dim1=1, dim2=2
             ).abs().sum(-1)
+
             if prec_matrix.size(1) > 1:
                 prec_loss = prec_loss / (
                     prec_matrix.size(1) * (prec_matrix.size(1) - 1)
                 )
-            else:  # Univariate case, can happen when intervening
-                prec_loss = prec_loss
-            prec_loss = self.reg_weight * prec_loss.mean(-1)
+
+            prec_loss = self.config.loss.reg_weight * prec_loss.mean(-1)
         else:
-            prec_loss = torch.zeros_like(concepts_loss)
+            prec_loss = torch.zeros_like(concept_loss)
 
-        total_loss = target_loss + self.alpha * concepts_loss + prec_loss
+        return class_loss, concept_loss, prec_loss
 
-        return target_loss, concepts_loss, prec_loss, total_loss
-
-    def compute_concept_loss(self, concepts_mcmc_logit, concepts_true):
-        concepts_true_expanded = concepts_true.unsqueeze(-1).expand_as(
-            concepts_mcmc_logit
+    def compute_concept_loss(self, concept_mcmc_logit, concept_true):
+        concepts_true_expanded = concept_true.unsqueeze(-1).expand_as(
+            concept_mcmc_logit
         )
 
         bce_loss = F.binary_cross_entropy_with_logits(
-            concepts_mcmc_logit, concepts_true_expanded.float(), reduction="none"
+            concept_mcmc_logit, concepts_true_expanded.float(), reduction="none"
         )  # [B,C,MCMC]
         intermediate_concepts_loss = -torch.sum(bce_loss, dim=1)  # [B,MCMC]
         mcmc_loss = -torch.logsumexp(
@@ -166,4 +95,4 @@ class SCBLoss(nn.Module):
         # The concept loss computation is bounded by - log_num_mc adding log_num_mc moves
         # bound to 0. Preventing negative losses.
 
-        return torch.mean(mcmc_loss) + self.log_num_mc
+        return torch.mean(mcmc_loss) + math.log(self.config.num_monte_carlo)

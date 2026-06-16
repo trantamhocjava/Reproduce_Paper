@@ -1,0 +1,17 @@
+config = {
+    "mode": "train",
+    "last_state": None,
+    "cp_path": "/kaggle/working/checkpoint",
+    "select_concepts_data_path": "/kaggle/input/datasets/tmtrnhelloworld/adacbmalgo-vitl14-nct/select_concept_data.pth",
+    "dataset_name": "nct",
+    "dataset_dir": "/kaggle/input/datasets/tmtrnhelloworld/nct-crc-he10ksplitted",
+    "monitor": "val_y_bmac",
+    "start_epoch": 1,
+    "end_epoch": 1,
+    "batch_size": 128,
+    "num_fold": 5,
+    "transform": "uniform",
+    "amp": True,
+    "optimizer": {"optimizer": "adamw", "lr": 0.0001},
+    "model": {"clip_model": "ViT-L-14", "num_adamodule_layer": 2},
+}

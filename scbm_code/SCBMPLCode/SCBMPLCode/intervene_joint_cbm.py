@@ -5,7 +5,7 @@ from pytorch_lightning.utilities import rank_zero_info
 
 from . import const, utils
 from .intervene.intervene_cbm import intervene_cbm
-from .model.cbm import CBM
+from .model.cbm.cbm import CBM
 
 
 def main(config):
@@ -113,6 +113,6 @@ if __name__ == "__main__":
         "--inter_strategy", type="str", dest="inter_strategy", default=None
     )
 
-    (cfg, args) = parser.parse_args()
+    cfg, args = parser.parse_args()
 
     main(cfg)

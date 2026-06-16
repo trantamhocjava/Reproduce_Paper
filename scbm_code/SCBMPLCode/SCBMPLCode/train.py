@@ -7,8 +7,8 @@ from sklearn import metrics
 
 from . import utils
 from .loss import CBLoss, SCBLoss
-from .model.cbm import CBM
-from .model.scbm import SCBM
+from .model.cbm.cbm import CBM
+from .model.scbm.scbm import SCBM
 
 
 class MetricCalculator:

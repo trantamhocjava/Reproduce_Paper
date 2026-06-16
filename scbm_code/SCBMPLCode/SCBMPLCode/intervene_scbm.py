@@ -5,7 +5,7 @@ from pytorch_lightning.utilities import rank_zero_info
 
 from . import const, utils
 from .intervene.intervene_scbm import intervene_scbm
-from .model.scbm import SCBM
+from .model.scbm.scbm import SCBM
 
 
 def main(config):
@@ -111,6 +111,6 @@ if __name__ == "__main__":
     parser.add_option("--reg_weight", type="float", dest="reg_weight", default=None)
     parser.add_option("--level", type="float", dest="level", default=None)
 
-    (cfg, args) = parser.parse_args()
+    cfg, args = parser.parse_args()
 
     main(cfg)

@@ -12,6 +12,7 @@ config = {
     "optimizer": {"optimizer": "adamw", "lr": 0.0001},
     "amp": True,
     "batch_size": 64,
+    "num_fold": 5,
     "transform": "uniform",
     "loss": {
         "cpt_lambda": 1,

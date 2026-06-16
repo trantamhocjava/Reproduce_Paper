@@ -9,6 +9,7 @@ train_config = {
     "start_epoch": 1,
     "end_epoch": 1,
     "batch_size": 128,
+    "num_fold": 5,
     "optimizer": {"optimizer": "adamw", "lr": 0.0001},
     "amp": True,
     "loss": {

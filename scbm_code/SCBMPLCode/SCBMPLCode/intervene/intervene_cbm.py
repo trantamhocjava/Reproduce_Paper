@@ -7,7 +7,7 @@ from pytorch_lightning.utilities import rank_zero_info
 from torch.utils.data import DataLoader, TensorDataset
 
 from ..loss import CBLoss
-from ..model.cbm import CBM
+from ..model.cbm.cbm import CBM
 from ..train import MetricCalculator
 from . import utils as intervene_utils
 

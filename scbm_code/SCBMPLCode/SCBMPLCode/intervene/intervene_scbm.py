@@ -13,7 +13,7 @@ from torchmin import minimize
 
 from .. import utils
 from ..loss import SCBLoss
-from ..model.scbm import SCBM
+from ..model.scbm.scbm import SCBM
 from ..train import MetricCalculator
 from . import utils as intervene_utils
 
@@ -144,7 +144,7 @@ class SCBMIntervene0Concept(pl.LightningModule):
         data, label, concept = batch
 
         # Forward pass
-        (concepts_mcmc_probs, c_mu, triang_cov, target_pred_logits, c_mcmc_logit) = (
+        concepts_mcmc_probs, c_mu, triang_cov, target_pred_logits, c_mcmc_logit = (
             self.model(data, self.current_epoch, validation=True, return_full=True)
         )
 

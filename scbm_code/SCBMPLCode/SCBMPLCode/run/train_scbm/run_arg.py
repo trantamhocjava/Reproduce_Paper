@@ -1,0 +1,28 @@
+config = {
+    "mode": "train",
+    "last_state": None,
+    "cp_path": "/kaggle/working/checkpoint",
+    "best_model": "/kaggle/working/checkpoint/best.ckpt",
+    "select_concepts_data_path": "/kaggle/input/datasets/tmtrnhelloworld/adacbmalgo-vitl14-nct/select_concept_data.pth",
+    "dataset_name": "cub",
+    "dataset_dir": "/kaggle/input/datasets/tmtrnhelloworld/cub2002011splitted622",
+    "monitor": "val_y_bmac",
+    "start_epoch": 1,
+    "end_epoch": 1,
+    "batch_size": 128,
+    "transform": "uniform",
+    "optimizer": {"optimizer": "adamw", "lr": 0.0001},
+    "amp": True,
+    "model": {
+        "head_arch": "linear",
+        "straight_through": True,
+        "concept_learning": "hard",
+        "encoder_arch": "resnet18",
+    },
+    "loss": {
+        "reg_precision": "l1",
+        "reg_weight": 1,
+        "concept_lambda": 1.0,
+    },
+    "num_monte_carlo": 100,
+}

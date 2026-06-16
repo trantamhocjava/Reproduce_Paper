@@ -16,8 +16,8 @@ from torchvision.transforms import v2
 
 from . import const
 from .const import DATASET_CLASS
-from .model.cbm import CBM
-from .model.scbm import SCBM
+from .model.cbm.cbm import CBM
+from .model.scbm.scbm import SCBM
 
 
 def str2obj(text):

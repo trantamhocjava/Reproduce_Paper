@@ -37,3 +37,20 @@ def setup_train(config):
     config.class_concept = cbm_const.CLASS_AND_CONCEPT[config.dataset_name]
     config.class_names = config.class_concept["class_names"]
     config.num_class = len(config.class_names)
+
+
+def load_dataset(
+    dataset_dir,
+    class_names,
+    transform,
+    concept2class,
+    mode,
+):
+    data_set = dataset.ImageConceptDataset(
+        dataset_dir=f"{dataset_dir}/{mode}",
+        transform=transform,
+        class_names=class_names,
+        concept2class=concept2class,
+    )
+
+    return data_set
