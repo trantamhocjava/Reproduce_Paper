@@ -1,7 +1,7 @@
 train_config = {
     "last_state": None,
     "cp_path": "/kaggle/working/checkpoint",
-    "select_concept_data_path": "/kaggle/input/datasets/tmtrnhelloworld/klselectconceptadaalgo/select_concept_data.pth",
+    "select_concepts_data_path": "/kaggle/input/datasets/tmtrnhelloworld/klselectconceptadaalgo/select_concept_data.pth",
     "dataset_name": "isic2018",
     "dataset_dir": "/kaggle/input/datasets/tmtrnhelloworld/isic2018splittedv1",
     "transform": "uniform",
