@@ -17,10 +17,10 @@ config = {
         "lambda_concept": 1,
     },
     "model": {
-        "C_fc_name": "ViT-L-14",
-        "y_fc_name": "ViT-L-14",
-        "fc_layers": "ViT-L-14",
-        "pretrained_model_name": "ViT-L-14",
-        "dropout": "ViT-L-14",
+        "C_fc_name": "fc1",
+        "y_fc_name": "fc4",
+        "fc_layers": [350, 50, 50, 7],
+        "pretrained_model_name": "resnet18",
+        "dropout": 0.0,
     },
 }

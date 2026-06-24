@@ -1,39 +1,68 @@
 import torch
 import torch.nn.functional as F
-from kltn_utils import kltn_const
+from kltn_utils import kltn_const, kltn_utils
 from torch import nn
 
 from ..adacbm_hybridcbm import adacbm_hybridcbm
+from ..explicd_hybridcbm.ffn import FFN
 from . import utils as explicd_hybridcbm_utils
-from .ffn import FFN
 
 
-class ExplicdHybridCBM(adacbm_hybridcbm.AdaHybridCBM):
+class ExplicdHybridCBM_v1(nn.Module):
     def __init__(self, config, select_concept_data):
-        super().__init__(config, select_concept_data)
+        super().__init__()
+        self.config = config
 
+        # var
+        self.register_buffer(
+            "scale", torch.tensor(config.model.scale, dtype=torch.float32)
+        )
+        self.register_buffer(
+            "static_concept_feat",
+            select_concept_data["concept_feat"],
+        )
+        self.register_buffer(
+            "class_feat",
+            select_concept_data["class_feat"],
+        )
+
+        self.num_static_concept, concept_dim = select_concept_data["concept_feat"].shape
+        self.num_concept = self.num_static_concept + config.model.num_dynamic_concept
+
+        # clip_model
+        self.clip_model, tokenizer = kltn_utils.build_clip_model(
+            config.model.clip_model
+        )
+
+        # cls_head
+        self.cls_head = torch.nn.Linear(self.num_concept, self.config.num_class)
+
+        # dynamic_concept_feat
+        self.dynamic_concept_feat = nn.Parameter(
+            torch.randn(config.model.num_dynamic_concept, concept_dim)
+        )
+
+        # visual_tokens
         clip_model_config = kltn_const.CLIP_MODELS[config.model.clip_model]
         visual_feature_dim = clip_model_config["visual_feature_dim"]
         num_heads = clip_model_config["num_heads"]
 
-        ## Get visual_tokens
         self.visual_tokens = nn.Parameter(
             nn.init.xavier_uniform_(torch.zeros(self.num_concept, visual_feature_dim))
         )
 
-        ## Get adaptive module
+        ## adaptive module
         self.adaptive_module = adacbm_hybridcbm.AdaptiveModule(
             dim=visual_feature_dim, num_layers=config.model.num_ada_layer
         )
 
-        ## Get cross_attn
+        ## cross_attn
         self.cross_attn = nn.MultiheadAttention(
             embed_dim=visual_feature_dim, num_heads=num_heads, batch_first=True
         )
         self.ffn = FFN(visual_feature_dim, visual_feature_dim * 4)
         self.layer_norm = nn.LayerNorm(visual_feature_dim)
 
-        concept_dim = self.static_concept_feat.shape[1]
         self.proj = nn.Linear(
             in_features=visual_feature_dim, out_features=concept_dim, bias=False
         )
